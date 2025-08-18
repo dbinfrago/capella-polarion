@@ -347,7 +347,7 @@ class CapellaPolarionWorker:
 
         if new.description:
             new.description.value = chelpers.process_html_fragments(
-                new.description.value, set_attachment_id
+                new.description.value or "", set_attachment_id
             )
         for _, attributes in new.additional_attributes.items():
             if (
