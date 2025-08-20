@@ -1,0 +1,27 @@
+# Copyright DB InfraGO AG and contributors
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://gitlab.com/gitlab-org/gitlab/-/raw/master/app/assets/javascripts/editor/schema/ci.json
+
+variables:
+  CAPELLA2POLARION_DEBUG: "0"
+  # Remember to set the following environment variables:
+  # POLARION_HOST
+  # POLARION_PAT
+  # CAPELLA2POLARION_PROJECT_ID
+  # CAPELLA2POLARION_CAPELLA_MODEL
+  # CAPELLA2POLARION_DOCUMENT_CONFIG
+  # Optional flags:
+  # CAPELLA2POLARION_OVERWRITE_LAYOUTS - Overwrite default Live-Doc layouts
+  # CAPELLA2POLARION_OVERWRITE_NUMBERING - Overwrite default heading numbering
+
+capella2polarion_render_documents:
+  needs:
+    - job: update_capella_diagram_cache
+      artifacts: true
+    - job: capella2polarion_synchronise_elements
+
+  image:
+    name: ghcr.io/capella-polarion/capella-polarion:$CAPELLA2POLARION_VERSION
+    entrypoint: [/usr/bin/bash]
+  script:
+    - capella2polarion render-documents
