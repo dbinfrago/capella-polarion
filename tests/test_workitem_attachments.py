@@ -687,3 +687,47 @@ def test_context_diagram_attachment_checksum_covers_different_custom_diagrams(
     assert attachment.render_params == expected_render_params
     assert attachment.title == expected_title
     assert attachment.mime_type == "image/svg+xml"
+
+
+def test_context_diagram_checksum_changes_with_styleclass(
+    model: capellambse.MelodyModel,
+):
+    uuid = "d4a22478-5717-4ca7-bfc9-9a193e6218a8"
+    diagram = model.by_uuid(uuid).context_diagram
+    attachment1 = data_model.CapellaContextDiagramAttachment(
+        diagram,
+        "__C2P__context_diagram.svg",
+        {},
+        "Diagram",
+    )
+    attachment2 = data_model.CapellaContextDiagramAttachment(
+        diagram,
+        "__C2P__context_diagram.svg",
+        {},
+        "Diagram",
+    )
+
+    original_get_styleclass = attachment2._get_styleclass
+
+    def mock_get_styleclass(uuid_param: str) -> str | None:
+        """Return a modified styleclass."""
+        original = original_get_styleclass(uuid_param)
+        if original:
+            return f"modified-{original}"
+        return original
+
+    attachment2._get_styleclass = mock_get_styleclass  # type: ignore[method-assign]
+    elk_input1 = diagram.elk_input_data({})
+    elk_input2 = diagram.elk_input_data({})
+
+    assert attachment1.content_checksum != attachment2.content_checksum, (
+        "Checksums should differ when styleclasses change, "
+        "even if elk_input_data is the same"
+    )
+    assert len(attachment1.content_checksum) > 0
+    assert isinstance(attachment1.content_checksum, str)
+    assert len(attachment2.content_checksum) > 0
+    assert isinstance(attachment2.content_checksum, str)
+    assert elk_input1 is elk_input2 or elk_input1 == elk_input2, (
+        "elk_input_data should be the same for both attachments"
+    )
