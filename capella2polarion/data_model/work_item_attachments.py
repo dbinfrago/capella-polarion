@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import dataclasses
 import hashlib
+import json
 import logging
 import typing as t
 
@@ -137,8 +138,13 @@ class CapellaContextDiagramAttachment(CapellaDiagramAttachment):
                         exclude_defaults=True
                     )
 
+                styleclass_map = self._build_styleclass_map(elk_input)
+                styleclass_str = json.dumps(
+                    styleclass_map, sort_keys=True, separators=(",", ":")
+                )
+
                 self._checksum = hashlib.sha256(
-                    input_str.encode("utf-8")
+                    f"{input_str};{styleclass_str}".encode()
                 ).hexdigest()
             except Exception as e:
                 logger.error(
@@ -150,6 +156,78 @@ class CapellaContextDiagramAttachment(CapellaDiagramAttachment):
                 )
                 return super().content_checksum
         return self._checksum
+
+    def _build_styleclass_map(self, elk_input: t.Any) -> dict[str, str]:
+        """Build a mapping of all UUIDs to their styleclasses.
+
+        Only includes ports, children (elements), and edges. Labels are
+        excluded as they inherit styleclasses from their parents.
+        """
+        styleclass_map: dict[str, str] = {}
+        if isinstance(elk_input, tuple):
+            input_data = elk_input[0]
+            if len(elk_input) > 1:
+                edges_or_list = elk_input[1]
+                if isinstance(edges_or_list, list):
+                    for edge in edges_or_list:
+                        if (
+                            hasattr(edge, "id")
+                            and edge.id
+                            and (styleclass := self._get_styleclass(edge.id))
+                        ):
+                            styleclass_map[edge.id] = styleclass
+                else:
+                    self._extract_uuids_recursive(
+                        edges_or_list, styleclass_map
+                    )
+        else:
+            input_data = elk_input
+
+        self._extract_uuids_recursive(input_data, styleclass_map)
+        return styleclass_map
+
+    def _extract_uuids_recursive(
+        self, elk_data: t.Any, styleclass_map: dict[str, str]
+    ) -> None:
+        if hasattr(elk_data, "id") and elk_data.id:
+            styleclass = self._get_styleclass(elk_data.id)
+            if styleclass:
+                styleclass_map[elk_data.id] = styleclass
+
+        if hasattr(elk_data, "children"):
+            for child in elk_data.children:
+                self._extract_uuids_recursive(child, styleclass_map)
+
+        if hasattr(elk_data, "ports"):
+            for port in elk_data.ports:
+                if hasattr(port, "id") and port.id:
+                    styleclass = self._get_styleclass(port.id)
+                    if styleclass:
+                        styleclass_map[port.id] = styleclass
+
+        if hasattr(elk_data, "edges"):
+            for edge in elk_data.edges:
+                if hasattr(edge, "id") and edge.id:
+                    styleclass = self._get_styleclass(edge.id)
+                    if styleclass:
+                        styleclass_map[edge.id] = styleclass
+
+    def _get_styleclass(self, uuid: str) -> str | None:
+        """Return the style-class string from a given UUID.
+
+        This mirrors the logic from the context diagram serializer's
+        get_styleclass method.
+        """
+        try:
+            melodyobj = self.diagram._model.by_uuid(uuid)
+        except KeyError:
+            if not uuid.startswith("__"):
+                return None
+            return uuid[2:].split(":", 1)[0]
+        else:
+            if isinstance(melodyobj, model.Diagram):
+                return melodyobj.type.value
+            return melodyobj._get_styleclass()
 
 
 class PngConvertedSvgAttachment(Capella2PolarionAttachment):
