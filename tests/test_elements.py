@@ -284,19 +284,24 @@ class TestDiagramElements:
         )
 
     @staticmethod
-    def test_delete_diagrams(diagr_base_object: BaseObjectContainer):
+    @pytest.mark.asyncio
+    async def test_delete_diagrams(diagr_base_object: BaseObjectContainer):
         pw = diagr_base_object.pw
         diagr_base_object.mc.converter_session = {}
         diagr_base_object.mc.generate_work_items(pw.polarion_data_repo)
-        pw.create_missing_work_items(diagr_base_object.mc.converter_session)
-        pw.delete_orphaned_work_items(diagr_base_object.mc.converter_session)
+        await pw.create_missing_work_items(
+            diagr_base_object.mc.converter_session
+        )
+        await pw.delete_orphaned_work_items(
+            diagr_base_object.mc.converter_session
+        )
         assert pw.project_client is not None
-        assert pw.project_client.work_items.delete.call_count == 1
+        assert pw.project_client.work_items.async_delete.call_count == 1
         assert (
-            pw.project_client.work_items.delete.call_args[0][0][0].id
+            pw.project_client.work_items.async_delete.call_args[0][0][0].id
             == "Diag-1"
         )
-        assert pw.project_client.work_items.create.call_count == 0
+        assert pw.project_client.work_items.async_create.call_count == 0
 
 
 class TestModelElements:
@@ -752,7 +757,8 @@ class TestModelElements:
         assert links == [expected]
 
     @staticmethod
-    def test_update_work_items(
+    @pytest.mark.asyncio
+    async def test_update_work_items(
         monkeypatch: pytest.MonkeyPatch, base_object: BaseObjectContainer
     ):
         polarion_work_item_list: list[data_model.CapellaWorkItem] = [
@@ -789,38 +795,47 @@ class TestModelElements:
 
         del base_object.mc.converter_session["uuid2"]
 
-        get_work_item_mock = mock.MagicMock()
-        get_work_item_mock.return_value = polarion_work_item_list[0]
-        monkeypatch.setattr(
-            base_object.pw.project_client.work_items,
-            "get",
-            get_work_item_mock,
+        base_object.pw.project_client.work_items.async_get = mock.AsyncMock(
+            return_value=polarion_work_item_list[0]
+        )
+        base_object.pw.project_client.work_items.async_update = (
+            mock.AsyncMock()
+        )
+        base_object.pw.project_client.work_items.links.async_get_all = (
+            mock.AsyncMock(return_value=[])
         )
 
-        base_object.pw.compare_and_update_work_items(
+        await base_object.pw.compare_and_update_work_items(
             base_object.mc.converter_session
         )
         assert (
-            base_object.pw.project_client.work_items.links.get_all.call_count
+            base_object.pw.project_client.work_items.links.async_get_all.call_count
             == 0
         )
         assert (
-            base_object.pw.project_client.work_items.links.delete.call_count
+            base_object.pw.project_client.work_items.links.async_delete.call_count
             == 0
         )
         assert (
-            base_object.pw.project_client.work_items.links.create.call_count
+            base_object.pw.project_client.work_items.links.async_create.call_count
             == 0
         )
-        assert base_object.pw.project_client.work_items.update.call_count == 1
-        assert base_object.pw.project_client.work_items.get.call_count == 1
         assert (
-            base_object.pw.project_client.work_items.attachments.get_all.call_count  # pylint: disable=line-too-long
+            base_object.pw.project_client.work_items.async_update.call_count
+            == 1
+        )
+        assert (
+            base_object.pw.project_client.work_items.async_get.call_count == 1
+        )
+        assert (
+            base_object.pw.project_client.work_items.attachments.async_get_all.call_count  # pylint: disable=line-too-long
             == 0
         )
-        work_item = base_object.pw.project_client.work_items.update.call_args[
-            0
-        ][0]
+        work_item = (
+            base_object.pw.project_client.work_items.async_update.call_args[0][
+                0
+            ]
+        )
         assert isinstance(work_item, data_model.CapellaWorkItem)
         assert work_item.id == "Obj-1"
         assert work_item.title == "Fake 1"
@@ -832,7 +847,8 @@ class TestModelElements:
         assert work_item.uuid_capella is None
 
     @staticmethod
-    def test_update_type_and_attributes_change(
+    @pytest.mark.asyncio
+    async def test_update_type_and_attributes_change(
         base_object: BaseObjectContainer,
     ):
         old_wi = data_model.CapellaWorkItem(
@@ -851,9 +867,18 @@ class TestModelElements:
         old_wi.linked_work_items = []
         old_wi.linked_work_items_truncated = False
         base_object.pw.polarion_data_repo.update_work_items([old_wi])
-        base_object.pw.project_client.work_items.get.return_value = old_wi
-        base_object.pw.project_client.work_items.attachments.get_all.return_value = []
-        base_object.pw.project_client.work_items.links.get_all.return_value = []
+        base_object.pw.project_client.work_items.async_get = mock.AsyncMock(
+            return_value=old_wi
+        )
+        base_object.pw.project_client.work_items.attachments.async_get_all = (
+            mock.AsyncMock(return_value=[])
+        )
+        base_object.pw.project_client.work_items.links.async_get_all = (
+            mock.AsyncMock(return_value=[])
+        )
+        base_object.pw.project_client.work_items.async_update = (
+            mock.AsyncMock()
+        )
         new_wi = data_model.CapellaWorkItem(
             id="Obj-1",
             type="newType",
@@ -869,11 +894,11 @@ class TestModelElements:
             new_wi,
         )
 
-        base_object.pw.compare_and_update_work_items(
+        await base_object.pw.compare_and_update_work_items(
             base_object.mc.converter_session
         )
 
-        calls = base_object.pw.project_client.work_items.update.call_args_list
+        calls = base_object.pw.project_client.work_items.async_update.call_args_list
         assert len(calls) == 2, (
             "Expected exactly two update() calls for type + attributes"
         )
@@ -889,7 +914,8 @@ class TestModelElements:
         assert "keep" in second_arg.additional_attributes
 
     @staticmethod
-    def test_update_deleted_work_item(
+    @pytest.mark.asyncio
+    async def test_update_deleted_work_item(
         monkeypatch: pytest.MonkeyPatch, base_object: BaseObjectContainer
     ):
         polarion_work_item_list: list[data_model.CapellaWorkItem] = [
@@ -930,27 +956,49 @@ class TestModelElements:
             "get",
             get_work_item_mock,
         )
-        base_object.pw.delete_orphaned_work_items(
+        await base_object.pw.delete_orphaned_work_items(
             base_object.mc.converter_session
         )
-        assert base_object.pw.project_client.work_items.update.called is False
+        assert (
+            base_object.pw.project_client.work_items.async_delete.called
+            is False
+        )
 
-        base_object.pw.create_missing_work_items(
+        await base_object.pw.create_missing_work_items(
             base_object.mc.converter_session
         )
-        assert base_object.pw.project_client.work_items.create.called is False
+        assert (
+            base_object.pw.project_client.work_items.async_create.called
+            is False
+        )
 
-        base_object.pw.compare_and_update_work_items(
+        base_object.pw.project_client.work_items.async_get = mock.AsyncMock(
+            return_value=polarion_work_item_list[0]
+        )
+        base_object.pw.project_client.work_items.async_update = (
+            mock.AsyncMock()
+        )
+        base_object.pw.project_client.work_items.links.async_get_all = (
+            mock.AsyncMock(return_value=[])
+        )
+        base_object.pw.project_client.work_items.attachments.async_get_all = (
+            mock.AsyncMock(return_value=[])
+        )
+
+        await base_object.pw.compare_and_update_work_items(
             base_object.mc.converter_session
         )
-        work_item = base_object.pw.project_client.work_items.update.call_args[
-            0
-        ][0]
+        work_item = (
+            base_object.pw.project_client.work_items.async_update.call_args[0][
+                0
+            ]
+        )
         assert isinstance(work_item, data_model.CapellaWorkItem)
         assert work_item.status == "open"
 
     @staticmethod
-    def test_create_new_work_item(base_object: BaseObjectContainer):
+    @pytest.mark.asyncio
+    async def test_create_new_work_item(base_object: BaseObjectContainer):
         polarion_api_get_all_work_items = mock.MagicMock()
         polarion_api_get_all_work_items.return_value = [
             data_model.CapellaWorkItem(
@@ -965,12 +1013,12 @@ class TestModelElements:
         )
 
         base_object.pw.load_polarion_work_item_map()
-        base_object.pw.create_missing_work_items(
+        await base_object.pw.create_missing_work_items(
             base_object.mc.converter_session
         )
 
         polarion_api_create_work_items = (
-            base_object.pw.project_client.work_items.create
+            base_object.pw.project_client.work_items.async_create
         )
 
         assert polarion_api_create_work_items.call_count == 1
@@ -987,7 +1035,8 @@ class TestModelElements:
         )
 
     @staticmethod
-    def test_update_work_items_filters_work_items_with_same_checksum(
+    @pytest.mark.asyncio
+    async def test_update_work_items_filters_work_items_with_same_checksum(
         base_object: BaseObjectContainer,
     ):
         base_object.pw.polarion_data_repo.update_work_items(
@@ -1004,14 +1053,15 @@ class TestModelElements:
 
         del base_object.mc.converter_session["uuid2"]
 
-        base_object.pw.compare_and_update_work_items(
+        await base_object.pw.compare_and_update_work_items(
             base_object.mc.converter_session
         )
 
         assert base_object.pw.project_client.work_items.update.call_count == 0
 
     @staticmethod
-    def test_update_work_items_same_checksum_force(
+    @pytest.mark.asyncio
+    async def test_update_work_items_same_checksum_force(
         base_object: BaseObjectContainer,
     ):
         base_object.pw.force_update = True
@@ -1026,28 +1076,43 @@ class TestModelElements:
                 )
             ]
         )
-        base_object.pw.project_client.work_items.get.return_value = (
-            data_model.CapellaWorkItem(
+        base_object.pw.project_client.work_items.async_get = mock.AsyncMock(
+            return_value=data_model.CapellaWorkItem(
                 id="Obj-1",
                 type="fakeModelObject",
                 uuid_capella="uuid1",
             )
         )
+        base_object.pw.project_client.work_items.async_update = (
+            mock.AsyncMock()
+        )
+        base_object.pw.project_client.work_items.links.async_get_all = (
+            mock.AsyncMock(return_value=[])
+        )
+        base_object.pw.project_client.work_items.attachments.async_get_all = (
+            mock.AsyncMock(return_value=[])
+        )
         del base_object.mc.converter_session["uuid2"]
 
-        base_object.pw.compare_and_update_work_items(
+        await base_object.pw.compare_and_update_work_items(
             base_object.mc.converter_session
         )
 
-        assert base_object.pw.project_client.work_items.update.call_count == 1
+        assert (
+            base_object.pw.project_client.work_items.async_update.call_count
+            == 1
+        )
 
     @staticmethod
-    def test_update_links_with_no_elements(base_object: BaseObjectContainer):
+    @pytest.mark.asyncio
+    async def test_update_links_with_no_elements(
+        base_object: BaseObjectContainer,
+    ):
         base_object.pw.polarion_data_repo = (
             polarion_repo.PolarionDataRepository()
         )
         base_object.mc.converter_session = {}
-        base_object.pw.compare_and_update_work_items(
+        await base_object.pw.compare_and_update_work_items(
             base_object.mc.converter_session
         )
 
@@ -1057,7 +1122,8 @@ class TestModelElements:
         )
 
     @staticmethod
-    def test_update_links(base_object: BaseObjectContainer):
+    @pytest.mark.asyncio
+    async def test_update_links(base_object: BaseObjectContainer):
         link = polarion_api.WorkItemLink(
             "Obj-1", "Obj-2", "attribute", True, "project_id"
         )
@@ -1088,9 +1154,14 @@ class TestModelElements:
         for data in base_object.mc.converter_session.values():
             data.type_config.links[0].polarion_role = "attribute"
 
-        base_object.pw.project_client.work_items.links.get_all.side_effect = (
-            [link],
-            [],
+        base_object.pw.project_client.work_items.links.async_get_all = (
+            mock.AsyncMock(side_effect=[[link], []])
+        )
+        base_object.pw.project_client.work_items.links.async_create = (
+            mock.AsyncMock()
+        )
+        base_object.pw.project_client.work_items.links.async_delete = (
+            mock.AsyncMock()
         )
         expected_new_link = polarion_api.WorkItemLink(
             "Obj-2", "Obj-1", "attribute", None, "project_id"
@@ -1113,42 +1184,49 @@ class TestModelElements:
         work_item_1.linked_work_items_truncated = True
         work_item_2.linked_work_items_truncated = True
 
-        base_object.pw.project_client.work_items.get.side_effect = (
-            work_item_1,
-            work_item_2,
+        base_object.pw.project_client.work_items.async_get = mock.AsyncMock(
+            side_effect=[work_item_1, work_item_2]
+        )
+        base_object.pw.project_client.work_items.async_update = (
+            mock.AsyncMock()
+        )
+        base_object.pw.project_client.work_items.attachments.async_get_all = (
+            mock.AsyncMock(return_value=[])
         )
 
-        base_object.pw.compare_and_update_work_items(
+        await base_object.pw.compare_and_update_work_items(
             base_object.mc.converter_session
         )
         links = (
-            base_object.pw.project_client.work_items.links.get_all.call_args_list  # pylint: disable=line-too-long
+            base_object.pw.project_client.work_items.links.async_get_all.call_args_list  # pylint: disable=line-too-long
         )
         assert (
-            base_object.pw.project_client.work_items.links.get_all.call_count
+            base_object.pw.project_client.work_items.links.async_get_all.call_count
             == 2
         )
         assert [links[0][0][0], links[1][0][0]] == ["Obj-1", "Obj-2"]
-        new_links = (
-            base_object.pw.project_client.work_items.links.create.call_args[0][
-                0
-            ]
-        )
+        new_links = base_object.pw.project_client.work_items.links.async_create.call_args[
+            0
+        ][0]
         assert (
-            base_object.pw.project_client.work_items.links.create.call_count
+            base_object.pw.project_client.work_items.links.async_create.call_count
             == 1
         )
         assert new_links == [expected_new_link]
         assert (
-            base_object.pw.project_client.work_items.links.delete.call_count
+            base_object.pw.project_client.work_items.links.async_delete.call_count
             == 1
         )
-        assert base_object.pw.project_client.work_items.links.delete.call_args[
-            0
-        ][0] == [link]
+        assert (
+            base_object.pw.project_client.work_items.links.async_delete.call_args[
+                0
+            ][0]
+            == [link]
+        )
 
     @staticmethod
-    def test_patch_work_item_grouped_links(
+    @pytest.mark.asyncio
+    async def test_patch_work_item_grouped_links(
         model: capellambse.MelodyModel,
         monkeypatch: pytest.MonkeyPatch,
         base_object: BaseObjectContainer,
@@ -1185,10 +1263,27 @@ class TestModelElements:
             "create_links_for_work_item",
             mock_create_links,
         )
-        mock_create_links.side_effect = lambda uuid, *args: dummy_work_items[  # noqa: ARG005
+        mock_create_links.side_effect = lambda uuid, *_: dummy_work_items[
             uuid
         ].linked_work_items
-        base_object.pw.project_client.work_items.get.side_effect = work_items
+        base_object.pw.project_client.work_items.async_get = mock.AsyncMock(
+            side_effect=work_items
+        )
+        base_object.pw.project_client.work_items.async_update = (
+            mock.AsyncMock()
+        )
+        base_object.pw.project_client.work_items.links.async_get_all = (
+            mock.AsyncMock(return_value=[])
+        )
+        base_object.pw.project_client.work_items.links.async_create = (
+            mock.AsyncMock()
+        )
+        base_object.pw.project_client.work_items.links.async_delete = (
+            mock.AsyncMock()
+        )
+        base_object.pw.project_client.work_items.attachments.async_get_all = (
+            mock.AsyncMock(return_value=[])
+        )
 
         def mock_back_link(converter_data, back_links):
             work_item = converter_data.work_item
@@ -1217,12 +1312,10 @@ class TestModelElements:
             base_object.pw.polarion_data_repo,
             generate_grouped_links_custom_fields=True,
         )
-        base_object.pw.compare_and_update_work_items(
+        await base_object.pw.compare_and_update_work_items(
             base_object.mc.converter_session
         )
-        update_work_item_calls = (
-            base_object.pw.project_client.work_items.update.call_args_list
-        )
+        update_work_item_calls = base_object.pw.project_client.work_items.async_update.call_args_list
         assert len(update_work_item_calls) == 3
         mock_grouped_links_calls = mock_grouped_links.call_args_list
         assert len(mock_grouped_links_calls) == 3

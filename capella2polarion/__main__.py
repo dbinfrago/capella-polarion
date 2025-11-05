@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import typing
 
@@ -49,6 +50,13 @@ logger = logging.getLogger(__name__)
     envvar="CAPELLA2POLARION_DELETE_WORK_ITEMS",
 )
 @click.option(
+    "--max-workers",
+    envvar="CAPELLA2POLARION_MAX_WORKERS",
+    type=int,
+    default=4,
+    help="Maximum number of worker processes (default: 4)",
+)
+@click.option(
     "--debug", is_flag=True, envvar="CAPELLA2POLARION_DEBUG", default=False
 )
 @click.version_option(
@@ -65,6 +73,7 @@ def cli(
     polarion_url: str,
     polarion_pat: str,
     polarion_delete_work_items: bool,
+    max_workers: int,
     debug: bool,
 ) -> None:
     """Synchronise data from Capella to Polarion."""
@@ -78,6 +87,7 @@ def cli(
         polarion_pat,
         polarion_delete_work_items,
         capella_model,
+        max_workers=max_workers,
     )
     capella2polarion_cli.setup_logger()
     ctx.obj = capella2polarion_cli
@@ -161,12 +171,14 @@ def synchronize(
     polarion_worker = pw.CapellaPolarionWorker(
         capella_to_polarion_cli.polarion_params,
         capella_to_polarion_cli.force_update,
+        max_workers=capella_to_polarion_cli.max_workers,
     )
 
     polarion_worker.load_polarion_work_item_map()
 
-    polarion_worker.delete_orphaned_work_items(converter.converter_session)
-    polarion_worker.create_missing_work_items(converter.converter_session)
+    asyncio.run(
+        polarion_worker.update_work_item_existence(converter.converter_session)
+    )
 
     # Create missing links for new work items
     converter.generate_work_items(
@@ -177,7 +189,11 @@ def synchronize(
         generate_figure_captions=generate_figure_captions,
     )
 
-    polarion_worker.compare_and_update_work_items(converter.converter_session)
+    asyncio.run(
+        polarion_worker.compare_and_update_work_items(
+            converter.converter_session
+        )
+    )
 
 
 @cli.command()

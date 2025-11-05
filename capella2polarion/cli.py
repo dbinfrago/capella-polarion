@@ -29,6 +29,7 @@ class Capella2PolarionCli:
         polarion_delete_work_items: bool,
         capella_model: capellambse.MelodyModel | None,
         force_update: bool = False,
+        max_workers: int = 4,
     ) -> None:
         self.debug = debug
         self.polarion_params = pw.PolarionWorkerParams(
@@ -41,6 +42,7 @@ class Capella2PolarionCli:
         self.capella_model = capella_model
         self.config = converter_config.ConverterConfig()
         self.force_update = force_update
+        self.max_workers = max_workers
 
     def print_state(self) -> None:
         """Print the State of the cli tool."""

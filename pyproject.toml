@@ -11,7 +11,7 @@ dynamic = ["version"]
 name = "capella2polarion"
 description = "Synchronise Capella models with Polarion projects"
 readme = "README.md"
-requires-python = ">=3.10, <3.14"
+requires-python = ">=3.10, <3.15"
 license = "Apache-2.0"
 license-files = ["LICENSES/*.txt"]
 authors = [{ name = "DB InfraGO AG" }]
@@ -25,6 +25,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Typing :: Typed",
 ]
 dependencies = [
@@ -55,6 +56,7 @@ dev = [
   "pre-commit>=4.2.0",
   "pre-commit-uv>=4.1.4",
   "pytest>=8.4.1",
+  "pytest-asyncio>=1.2.0",
   "pytest-cov>=6.2.1",
   "python-dotenv>=1.1.0",
   "reuse==5.0.2",
