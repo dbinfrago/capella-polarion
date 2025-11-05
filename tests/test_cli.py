@@ -86,19 +86,19 @@ def cli_mocks(monkeypatch: pytest.MonkeyPatch) -> CLIMocks:
         "generate_work_items",
         mock_generate_work_items,
     )
-    mock_delete_work_items = mock.MagicMock()
+    mock_delete_work_items = mock.AsyncMock()
     monkeypatch.setattr(
         polarion_worker.CapellaPolarionWorker,
         "delete_orphaned_work_items",
         mock_delete_work_items,
     )
-    mock_post_work_items = mock.MagicMock()
+    mock_post_work_items = mock.AsyncMock()
     monkeypatch.setattr(
         polarion_worker.CapellaPolarionWorker,
         "create_missing_work_items",
         mock_post_work_items,
     )
-    mock_patch_work_items = mock.MagicMock()
+    mock_patch_work_items = mock.AsyncMock()
     monkeypatch.setattr(
         polarion_worker.CapellaPolarionWorker,
         "compare_and_update_work_items",

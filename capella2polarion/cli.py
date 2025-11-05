@@ -8,6 +8,7 @@ import logging
 import pathlib
 import typing
 
+import capellambse
 import click
 
 from capella2polarion.connectors import polarion_worker as pw
@@ -26,8 +27,9 @@ class Capella2PolarionCli:
         polarion_url: str,
         polarion_pat: str,
         polarion_delete_work_items: bool,
-        capella_model_info: dict[str, typing.Any] | None,
+        capella_model: capellambse.MelodyModel | None,
         force_update: bool = False,
+        max_workers: int = 4,
     ) -> None:
         self.debug = debug
         self.polarion_params = pw.PolarionWorkerParams(
@@ -37,9 +39,10 @@ class Capella2PolarionCli:
             polarion_delete_work_items,
         )
 
-        self.capella_model_info = capella_model_info
+        self.capella_model = capella_model
         self.config = converter_config.ConverterConfig()
         self.force_update = force_update
+        self.max_workers = max_workers
 
     def print_state(self) -> None:
         """Print the State of the cli tool."""

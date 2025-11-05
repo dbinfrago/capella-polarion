@@ -163,13 +163,14 @@ class CapellaPolarionWorker:
                 logger.info("Delete work item %r...", wi.id)
                 work_items.append(wi)
 
-        try:
-            await self.project_client.work_items.async_delete(work_items)
-        except polarion_api.PolarionApiException as error:
-            logger.error("Deleting work items failed. %s", error.args[0])
-            raise error
+        if work_items:
+            try:
+                await self.project_client.work_items.async_delete(work_items)
+            except polarion_api.PolarionApiException as error:
+                logger.error("Deleting work items failed. %s", error.args[0])
+                raise error
 
-        self.polarion_data_repo.remove_work_items_by_capella_uuid(uuids)
+            self.polarion_data_repo.remove_work_items_by_capella_uuid(uuids)
 
     async def create_missing_work_items(
         self, converter_session: data_session.ConverterSession
@@ -197,7 +198,7 @@ class CapellaPolarionWorker:
     async def compare_and_update_work_item(
         self,
         converter_data: data_session.ConverterData,
-        executor: futures.ProcessPoolExecutor,
+        executor: futures.Executor,
     ) -> None:
         """Patch a given WorkItem."""
         new = converter_data.work_item
@@ -495,7 +496,7 @@ class CapellaPolarionWorker:
         self, converter_session: data_session.ConverterSession
     ) -> None:
         """Update work items in a Polarion project."""
-        with futures.ProcessPoolExecutor(
+        with futures.ThreadPoolExecutor(
             max_workers=self.max_workers
         ) as executor:
             coros = [

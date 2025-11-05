@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import json
+from concurrent import futures
 from unittest import mock
 
 import cairosvg
@@ -133,7 +134,8 @@ def test_diagram_has_attachments(converter: model_converter.ModelConverter):
 
 
 # pylint: disable=redefined-outer-name
-def test_diagram_attachments_new(
+@pytest.mark.asyncio
+async def test_diagram_attachments_new(
     converter: model_converter.ModelConverter,
     worker: polarion_worker.CapellaPolarionWorker,
 ):
@@ -144,25 +146,40 @@ def test_diagram_attachments_new(
         WORKITEM_ID, uuid_capella=TEST_DIAG_UUID, type="diagram"
     )
 
-    worker.project_client.work_items.get.return_value = old_wi
-    worker.project_client.work_items.attachments.get_all.return_value = []
-    worker.project_client.work_items.attachments.create.side_effect = (
-        set_attachment_ids
+    worker.project_client.work_items.async_get = mock.AsyncMock(
+        return_value=old_wi
+    )
+    worker.project_client.work_items.async_update = mock.AsyncMock()
+    worker.project_client.work_items.attachments.async_get_all = (
+        mock.AsyncMock(return_value=[])
+    )
+    worker.project_client.work_items.attachments.async_create = mock.AsyncMock(
+        side_effect=set_attachment_ids
     )
 
     converter.generate_work_items(worker.polarion_data_repo, False, True)
-    worker.compare_and_update_work_item(
-        converter.converter_session[TEST_DIAG_UUID]
-    )
 
-    assert worker.project_client.work_items.update.call_count == 1
-    assert worker.project_client.work_items.attachments.create.call_count == 1
-    assert worker.project_client.work_items.attachments.get_all.call_count == 0
+    with futures.ThreadPoolExecutor(max_workers=1) as executor:
+        await worker.compare_and_update_work_item(
+            converter.converter_session[TEST_DIAG_UUID], executor
+        )
+
+    assert worker.project_client.work_items.async_update.call_count == 1
+    assert (
+        worker.project_client.work_items.attachments.async_create.call_count
+        == 1
+    )
+    assert (
+        worker.project_client.work_items.attachments.async_get_all.call_count
+        == 0
+    )
     created_attachments: list[polarion_api.WorkItemAttachment] = (
-        worker.project_client.work_items.attachments.create.call_args.args[0]
+        worker.project_client.work_items.attachments.async_create.call_args.args[
+            0
+        ]
     )
     work_item: data_model.CapellaWorkItem = (
-        worker.project_client.work_items.update.call_args.args[0]
+        worker.project_client.work_items.async_update.call_args.args[0]
     )
     assert len(created_attachments) == 2
     assert created_attachments[0].title == created_attachments[1].title
@@ -180,7 +197,8 @@ def test_diagram_attachments_new(
 
 
 # pylint: disable=redefined-outer-name
-def test_new_diagram(
+@pytest.mark.asyncio
+async def test_new_diagram(
     converter: model_converter.ModelConverter,
     worker: polarion_worker.CapellaPolarionWorker,
 ):
@@ -195,27 +213,35 @@ def test_new_diagram(
             )
         ]
     )
-    worker.project_client.work_items.get.return_value = (
-        data_model.CapellaWorkItem(
+    worker.project_client.work_items.async_get = mock.AsyncMock(
+        return_value=data_model.CapellaWorkItem(
             WORKITEM_ID,
             uuid_capella=TEST_DIAG_UUID,
             type="diagram",
             checksum=checksum,
         )
     )
-    worker.project_client.work_items.attachments.create = mock.MagicMock()
-    worker.project_client.work_items.attachments.create.side_effect = (
-        set_attachment_ids
+    worker.project_client.work_items.async_update = mock.AsyncMock()
+    worker.project_client.work_items.attachments.async_create = mock.AsyncMock(
+        side_effect=set_attachment_ids
+    )
+    worker.project_client.work_items.attachments.async_get_all = (
+        mock.AsyncMock(return_value=[])
     )
 
     converter.generate_work_items(worker.polarion_data_repo, False, True)
-    worker.compare_and_update_work_item(
-        converter.converter_session[TEST_DIAG_UUID]
-    )
 
-    assert worker.project_client.work_items.update.call_count == 1
-    assert worker.project_client.work_items.attachments.create.call_count == 1
-    assert worker.project_client.work_items.update.call_args.args[
+    with futures.ThreadPoolExecutor(max_workers=1) as executor:
+        await worker.compare_and_update_work_item(
+            converter.converter_session[TEST_DIAG_UUID], executor
+        )
+
+    assert worker.project_client.work_items.async_update.call_count == 1
+    assert (
+        worker.project_client.work_items.attachments.async_create.call_count
+        == 1
+    )
+    assert worker.project_client.work_items.async_update.call_args.args[
         0
     ].description.value == TEST_DIAG_DESCR.format(
         title="Diagram",
@@ -225,7 +251,8 @@ def test_new_diagram(
     )
 
 
-def test_diagram_attachments_updated(
+@pytest.mark.asyncio
+async def test_diagram_attachments_updated(
     converter: model_converter.ModelConverter,
     worker: polarion_worker.CapellaPolarionWorker,
 ):
@@ -250,30 +277,44 @@ def test_diagram_attachments_updated(
             file_name="__C2P__diagram.png",
         ),
     ]
-    worker.project_client.work_items.get.return_value = (
-        data_model.CapellaWorkItem(
+    worker.project_client.work_items.async_get = mock.AsyncMock(
+        return_value=data_model.CapellaWorkItem(
             WORKITEM_ID,
             uuid_capella=TEST_DIAG_UUID,
             type="diagram",
             attachments=existing_attachments,
         )
     )
-    worker.project_client.work_items.attachments.get_all = mock.MagicMock()
-    worker.project_client.work_items.attachments.get_all.return_value = (
-        existing_attachments
+    worker.project_client.work_items.async_update = mock.AsyncMock()
+    worker.project_client.work_items.attachments.async_get_all = (
+        mock.AsyncMock(return_value=existing_attachments)
+    )
+    worker.project_client.work_items.attachments.async_update = (
+        mock.AsyncMock()
     )
 
     converter.generate_work_items(worker.polarion_data_repo, False, True)
-    worker.compare_and_update_work_item(
-        converter.converter_session[TEST_DIAG_UUID]
-    )
 
-    assert worker.project_client.work_items.update.call_count == 1
-    assert worker.project_client.work_items.attachments.create.call_count == 0
-    assert worker.project_client.work_items.attachments.update.call_count == 2
-    assert worker.project_client.work_items.attachments.get_all.call_count == 1
+    with futures.ThreadPoolExecutor(max_workers=1) as executor:
+        await worker.compare_and_update_work_item(
+            converter.converter_session[TEST_DIAG_UUID], executor
+        )
+
+    assert worker.project_client.work_items.async_update.call_count == 1
+    assert (
+        worker.project_client.work_items.attachments.async_create.call_count
+        == 0
+    )
+    assert (
+        worker.project_client.work_items.attachments.async_update.call_count
+        == 2
+    )
+    assert (
+        worker.project_client.work_items.attachments.async_get_all.call_count
+        == 1
+    )
     work_item: data_model.CapellaWorkItem = (
-        worker.project_client.work_items.update.call_args.args[0]
+        worker.project_client.work_items.async_update.call_args.args[0]
     )
     assert work_item.description.value == TEST_DIAG_DESCR.format(
         title="Diagram",
@@ -283,7 +324,8 @@ def test_diagram_attachments_updated(
     )
 
 
-def test_diagram_attachments_unchanged_work_item_changed(
+@pytest.mark.asyncio
+async def test_diagram_attachments_unchanged_work_item_changed(
     converter: model_converter.ModelConverter,
     worker: polarion_worker.CapellaPolarionWorker,
 ):
@@ -316,23 +358,37 @@ def test_diagram_attachments_unchanged_work_item_changed(
     worker.polarion_data_repo = polarion_repo.PolarionDataRepository(
         [diagram_work_item]
     )
-    worker.project_client.work_items.get.return_value = diagram_work_item
-    worker.project_client.work_items.attachments.get_all.return_value = (
-        diagram_work_item.attachments
+    worker.project_client.work_items.async_get = mock.AsyncMock(
+        return_value=diagram_work_item
+    )
+    worker.project_client.work_items.async_update = mock.AsyncMock()
+    worker.project_client.work_items.attachments.async_get_all = (
+        mock.AsyncMock(return_value=diagram_work_item.attachments)
     )
 
     converter.generate_work_items(worker.polarion_data_repo, False, True)
-    worker.compare_and_update_work_item(
-        converter.converter_session[TEST_DIAG_UUID]
-    )
 
-    assert worker.project_client.work_items.get.call_count == 1
-    assert worker.project_client.work_items.update.call_count == 1
-    assert worker.project_client.work_items.attachments.get_all.call_count == 1
-    assert worker.project_client.work_items.attachments.create.call_count == 0
-    assert worker.project_client.work_items.attachments.update.call_count == 0
+    with futures.ThreadPoolExecutor(max_workers=1) as executor:
+        await worker.compare_and_update_work_item(
+            converter.converter_session[TEST_DIAG_UUID], executor
+        )
+
+    assert worker.project_client.work_items.async_get.call_count == 1
+    assert worker.project_client.work_items.async_update.call_count == 1
+    assert (
+        worker.project_client.work_items.attachments.async_get_all.call_count
+        == 1
+    )
+    assert (
+        worker.project_client.work_items.attachments.async_create.call_count
+        == 0
+    )
+    assert (
+        worker.project_client.work_items.attachments.async_update.call_count
+        == 0
+    )
     work_item: data_model.CapellaWorkItem = (
-        worker.project_client.work_items.update.call_args.args[0]
+        worker.project_client.work_items.async_update.call_args.args[0]
     )
     assert work_item.description.value == TEST_DIAG_DESCR.format(
         title="Diagram",
@@ -342,7 +398,8 @@ def test_diagram_attachments_unchanged_work_item_changed(
     )
 
 
-def test_diagram_attachments_fully_unchanged(
+@pytest.mark.asyncio
+async def test_diagram_attachments_fully_unchanged(
     converter: model_converter.ModelConverter,
     worker: polarion_worker.CapellaPolarionWorker,
 ):
@@ -357,17 +414,29 @@ def test_diagram_attachments_fully_unchanged(
     )
 
     converter.generate_work_items(worker.polarion_data_repo, False, True)
-    worker.compare_and_update_work_item(
-        converter.converter_session[TEST_DIAG_UUID]
+
+    with futures.ThreadPoolExecutor(max_workers=1) as executor:
+        await worker.compare_and_update_work_item(
+            converter.converter_session[TEST_DIAG_UUID], executor
+        )
+
+    assert worker.project_client.work_items.async_update.call_count == 0
+    assert (
+        worker.project_client.work_items.attachments.async_create.call_count
+        == 0
+    )
+    assert (
+        worker.project_client.work_items.attachments.async_update.call_count
+        == 0
+    )
+    assert (
+        worker.project_client.work_items.attachments.async_get_all.call_count
+        == 0
     )
 
-    assert worker.project_client.work_items.update.call_count == 0
-    assert worker.project_client.work_items.attachments.create.call_count == 0
-    assert worker.project_client.work_items.attachments.update.call_count == 0
-    assert worker.project_client.work_items.attachments.get_all.call_count == 0
 
-
-def test_add_context_diagram(
+@pytest.mark.asyncio
+async def test_add_context_diagram(
     model: capellambse.MelodyModel,
     worker: polarion_worker.CapellaPolarionWorker,
 ):
@@ -385,26 +454,34 @@ def test_add_context_diagram(
         ),
         model.by_uuid(TEST_PHYS_FNC),
     )
-    worker.project_client.work_items.get.return_value = work_item
-    worker.project_client.work_items.attachments.create = mock.MagicMock()
-    worker.project_client.work_items.attachments.create.side_effect = (
-        set_attachment_ids
+    worker.project_client.work_items.async_get = mock.AsyncMock(
+        return_value=work_item
+    )
+    worker.project_client.work_items.async_update = mock.AsyncMock()
+    worker.project_client.work_items.attachments.async_create = mock.AsyncMock(
+        side_effect=set_attachment_ids
     )
 
     converter.generate_work_items(worker.polarion_data_repo, False, True)
 
-    worker.compare_and_update_work_item(
-        converter.converter_session[TEST_PHYS_FNC]
-    )
+    with futures.ThreadPoolExecutor(max_workers=1) as executor:
+        await worker.compare_and_update_work_item(
+            converter.converter_session[TEST_PHYS_FNC], executor
+        )
 
-    assert worker.project_client.work_items.update.call_count == 1
-    assert worker.project_client.work_items.attachments.create.call_count == 1
+    assert worker.project_client.work_items.async_update.call_count == 1
+    assert (
+        worker.project_client.work_items.attachments.async_create.call_count
+        == 1
+    )
 
     created_attachments: list[polarion_api.WorkItemAttachment] = (
-        worker.project_client.work_items.attachments.create.call_args.args[0]
+        worker.project_client.work_items.attachments.async_create.call_args.args[
+            0
+        ]
     )
     work_item: data_model.CapellaWorkItem = (
-        worker.project_client.work_items.update.call_args.args[0]
+        worker.project_client.work_items.async_update.call_args.args[0]
     )
 
     assert len(created_attachments) == 2
@@ -424,7 +501,8 @@ def test_add_context_diagram(
     )
 
 
-def test_update_context_diagram_no_changes(
+@pytest.mark.asyncio
+async def test_update_context_diagram_no_changes(
     model: capellambse.MelodyModel,
     worker: polarion_worker.CapellaPolarionWorker,
 ):
@@ -443,7 +521,22 @@ def test_update_context_diagram_no_changes(
     worker.polarion_data_repo = polarion_repo.PolarionDataRepository(
         [work_item]
     )
-    worker.project_client.work_items.get.return_value = work_item
+    worker.project_client.work_items.async_get = mock.AsyncMock(
+        return_value=work_item
+    )
+    worker.project_client.work_items.async_update = mock.AsyncMock()
+    worker.project_client.work_items.attachments.async_get_all = (
+        mock.AsyncMock(return_value=[])
+    )
+    worker.project_client.work_items.attachments.async_create = (
+        mock.AsyncMock()
+    )
+    worker.project_client.work_items.attachments.async_delete = (
+        mock.AsyncMock()
+    )
+    worker.project_client.work_items.attachments.async_update = (
+        mock.AsyncMock()
+    )
     converter.converter_session[TEST_PHYS_FNC] = data_session.ConverterData(
         "pa",
         converter_config.CapellaTypeConfig(
@@ -454,16 +547,22 @@ def test_update_context_diagram_no_changes(
 
     with mock.patch.object(context.ContextDiagram, "render") as wrapped_render:
         converter.generate_work_items(worker.polarion_data_repo, False, True)
-        worker.compare_and_update_work_item(
-            converter.converter_session[TEST_PHYS_FNC]
-        )
 
-    assert worker.project_client.work_items.update.call_count == 0
-    assert worker.project_client.work_items.attachments.update.call_count == 0
+        with futures.ThreadPoolExecutor(max_workers=1) as executor:
+            await worker.compare_and_update_work_item(
+                converter.converter_session[TEST_PHYS_FNC], executor
+            )
+
+    assert worker.project_client.work_items.async_update.call_count == 0
+    assert (
+        worker.project_client.work_items.attachments.async_update.call_count
+        == 0
+    )
     assert wrapped_render.call_count == 0
 
 
-def test_update_context_diagram_with_changes(
+@pytest.mark.asyncio
+async def test_update_context_diagram_with_changes(
     model: capellambse.MelodyModel,
     worker: polarion_worker.CapellaPolarionWorker,
 ):
@@ -490,27 +589,31 @@ def test_update_context_diagram_with_changes(
         ),
         model.by_uuid(TEST_PHYS_FNC),
     )
-    worker.project_client.work_items.attachments.get_all.return_value = [
-        polarion_api.WorkItemAttachment(
-            WORKITEM_ID,
-            "ID-1",
-            "Title",
-            None,
-            mime_type="img/svg+xml",
-            file_name="__C2P__context_diagram.svg",
-        ),
-        polarion_api.WorkItemAttachment(
-            WORKITEM_ID,
-            "ID-2",
-            "Title",
-            None,
-            mime_type="img/png",
-            file_name="__C2P__context_diagram.png",
-        ),
-    ]
-    # read the content manually on update as it be read in the client
-    worker.project_client.work_items.attachments.update.side_effect = (
-        read_content
+    worker.project_client.work_items.async_update = mock.AsyncMock()
+    worker.project_client.work_items.attachments.async_get_all = (
+        mock.AsyncMock(
+            return_value=[
+                polarion_api.WorkItemAttachment(
+                    WORKITEM_ID,
+                    "ID-1",
+                    "Title",
+                    None,
+                    mime_type="img/svg+xml",
+                    file_name="__C2P__context_diagram.svg",
+                ),
+                polarion_api.WorkItemAttachment(
+                    WORKITEM_ID,
+                    "ID-2",
+                    "Title",
+                    None,
+                    mime_type="img/png",
+                    file_name="__C2P__context_diagram.png",
+                ),
+            ]
+        )
+    )
+    worker.project_client.work_items.attachments.async_update = mock.AsyncMock(
+        side_effect=read_content
     )
 
     with mock.patch.object(context.ContextDiagram, "render") as wrapped_render:
@@ -519,16 +622,22 @@ def test_update_context_diagram_with_changes(
             'width="100" height="100"></svg>'
         )
         converter.generate_work_items(worker.polarion_data_repo, False, True)
-        worker.compare_and_update_work_item(
-            converter.converter_session[TEST_PHYS_FNC]
-        )
 
-    assert worker.project_client.work_items.update.call_count == 1
-    assert worker.project_client.work_items.attachments.update.call_count == 2
+        with futures.ThreadPoolExecutor(max_workers=1) as executor:
+            await worker.compare_and_update_work_item(
+                converter.converter_session[TEST_PHYS_FNC], executor
+            )
+
+    assert worker.project_client.work_items.async_update.call_count == 1
+    assert (
+        worker.project_client.work_items.attachments.async_update.call_count
+        == 2
+    )
     assert wrapped_render.call_count == 1
 
 
-def test_diagram_delete_attachments(
+@pytest.mark.asyncio
+async def test_diagram_delete_attachments(
     model: capellambse.MelodyModel,
     worker: polarion_worker.CapellaPolarionWorker,
 ):
@@ -549,27 +658,40 @@ def test_diagram_delete_attachments(
             )
         ]
     )
-    worker.project_client.work_items.attachments.get_all = mock.MagicMock()
-    worker.project_client.work_items.attachments.get_all.return_value = [
-        polarion_api.WorkItemAttachment(
-            WORKITEM_ID,
-            "SVG-ATTACHMENT",
-            "test",
-            file_name="__C2P__diagram.svg",
-        ),
-        polarion_api.WorkItemAttachment(
-            WORKITEM_ID,
-            "PNG-ATTACHMENT",
-            "test",
-            file_name="__C2P__diagram.png",
-        ),
-        polarion_api.WorkItemAttachment(
-            WORKITEM_ID, "SVG-DELETE", "test", file_name="delete_me.svg"
-        ),
-        polarion_api.WorkItemAttachment(
-            WORKITEM_ID, "PNG-DELETE", "test", file_name="delete_me.png"
-        ),
-    ]
+    worker.project_client.work_items.attachments.async_get_all = (
+        mock.AsyncMock(
+            return_value=[
+                polarion_api.WorkItemAttachment(
+                    WORKITEM_ID,
+                    "SVG-ATTACHMENT",
+                    "test",
+                    file_name="__C2P__diagram.svg",
+                ),
+                polarion_api.WorkItemAttachment(
+                    WORKITEM_ID,
+                    "PNG-ATTACHMENT",
+                    "test",
+                    file_name="__C2P__diagram.png",
+                ),
+                polarion_api.WorkItemAttachment(
+                    WORKITEM_ID,
+                    "SVG-DELETE",
+                    "test",
+                    file_name="delete_me.svg",
+                ),
+                polarion_api.WorkItemAttachment(
+                    WORKITEM_ID,
+                    "PNG-DELETE",
+                    "test",
+                    file_name="delete_me.png",
+                ),
+            ]
+        )
+    )
+    worker.project_client.work_items.async_update = mock.AsyncMock()
+    worker.project_client.work_items.attachments.async_delete = (
+        mock.AsyncMock()
+    )
 
     converter.converter_session[TEST_DIAG_UUID] = data_session.ConverterData(
         model_converter.get_layer_name(diag),
@@ -579,17 +701,27 @@ def test_diagram_delete_attachments(
 
     converter.generate_work_items(worker.polarion_data_repo, False, True)
 
-    worker.compare_and_update_work_item(
-        converter.converter_session[TEST_DIAG_UUID]
+    with futures.ThreadPoolExecutor(max_workers=1) as executor:
+        await worker.compare_and_update_work_item(
+            converter.converter_session[TEST_DIAG_UUID], executor
+        )
+
+    assert worker.project_client.work_items.async_update.call_count == 1
+    assert (
+        worker.project_client.work_items.attachments.async_create.call_count
+        == 0
+    )
+    assert (
+        worker.project_client.work_items.attachments.async_update.call_count
+        == 0
+    )
+    assert (
+        worker.project_client.work_items.attachments.async_delete.call_count
+        == 2
     )
 
-    assert worker.project_client.work_items.update.call_count == 1
-    assert worker.project_client.work_items.attachments.create.call_count == 0
-    assert worker.project_client.work_items.attachments.update.call_count == 0
-    assert worker.project_client.work_items.attachments.delete.call_count == 2
-
     work_item: data_model.CapellaWorkItem = (
-        worker.project_client.work_items.update.call_args.args[0]
+        worker.project_client.work_items.async_update.call_args.args[0]
     )
 
     assert work_item.description is None
@@ -598,7 +730,8 @@ def test_diagram_delete_attachments(
     assert work_item.checksum == DIAGRAM_CHECKSUM
 
 
-def test_attached_image_in_description_with_caption(
+@pytest.mark.asyncio
+async def test_attached_image_in_description_with_caption(
     model: capellambse.MelodyModel,
     worker: polarion_worker.CapellaPolarionWorker,
 ):
@@ -616,25 +749,36 @@ def test_attached_image_in_description_with_caption(
         converter_config.CapellaTypeConfig("test", {}),
         model.by_uuid(uuid),
     )
-    worker.project_client.work_items.get.return_value = work_item
-    worker.project_client.work_items.attachments.create = mock.MagicMock()
-    worker.project_client.work_items.attachments.create.side_effect = (
-        set_attachment_ids
+    worker.project_client.work_items.async_get = mock.AsyncMock(
+        return_value=work_item
+    )
+    worker.project_client.work_items.async_update = mock.AsyncMock()
+    worker.project_client.work_items.attachments.async_create = mock.AsyncMock(
+        side_effect=set_attachment_ids
     )
 
     converter.generate_work_items(
         worker.polarion_data_repo, False, True, False, True
     )
-    worker.compare_and_update_work_item(converter.converter_session[uuid])
 
-    assert worker.project_client.work_items.update.call_count == 1
-    assert worker.project_client.work_items.attachments.create.call_count == 1
+    with futures.ThreadPoolExecutor(max_workers=1) as executor:
+        await worker.compare_and_update_work_item(
+            converter.converter_session[uuid], executor
+        )
+
+    assert worker.project_client.work_items.async_update.call_count == 1
+    assert (
+        worker.project_client.work_items.attachments.async_create.call_count
+        == 1
+    )
 
     created_attachments: list[polarion_api.WorkItemAttachment] = (
-        worker.project_client.work_items.attachments.create.call_args.args[0]
+        worker.project_client.work_items.attachments.async_create.call_args.args[
+            0
+        ]
     )
     work_item: data_model.CapellaWorkItem = (
-        worker.project_client.work_items.update.call_args.args[0]
+        worker.project_client.work_items.async_update.call_args.args[0]
     )
 
     assert len(created_attachments) == 1

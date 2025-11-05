@@ -36,13 +36,6 @@ class ModelConverter:
 
         self.converter_session: data_session.ConverterSession = {}
 
-    @property
-    def model(self) -> capellambse.MelodyModel | None:
-        if self.model_info is None:
-            return None
-
-        return load_model(**self.model_info)
-
     def read_model(
         self,
         config: converter_config.ConverterConfig,
