@@ -1,0 +1,29 @@
+# Copyright DB InfraGO AG and contributors
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://gitlab.com/gitlab-org/gitlab/-/raw/master/app/assets/javascripts/editor/schema/ci.json
+
+variables:
+  CAPELLA2POLARION_DEBUG: "0"
+  # Remember to set the following environment variables:
+  # POLARION_HOST
+  # POLARION_PAT
+  # CAPELLA2POLARION_PROJECT_ID
+  # CAPELLA2POLARION_CAPELLA_MODEL
+  # CAPELLA2POLARION_SYNCHRONIZE_CONFIG
+  # Optional flags:
+  # CAPELLA2POLARION_FORCE_UPDATE - Simulate initial run
+  # CAPELLA2POLARION_TYPE_PREFIX - Prefix for work item types
+  # CAPELLA2POLARION_ROLE_PREFIX - Prefix for work item link roles
+  # CAPELLA2POLARION_GENERATE_FIGURE_CAPTIONS - Generate captions for figures
+  # CAPELLA2POLARION_GROUPED_LINKS_CUSTOM_FIELDS - Generate custom fields for links grouped by role
+
+capella2polarion_synchronise_elements:
+  needs:
+    - job: update_capella_diagram_cache
+      artifacts: true
+
+  image:
+    name: ghcr.io/capella-polarion/capella-polarion:$CAPELLA2POLARION_VERSION
+    entrypoint: [/usr/bin/bash]
+  script:
+    - capella2polarion synchronize
