@@ -35,6 +35,18 @@ WORK_ITEMS_IN_DOCUMENT_QUERY = (
     "rel1.FK_URI_MODULE = doc.C_URI AND rel1.FK_URI_WORKITEM = item.C_URI))"
 )
 """An SQL query to get work items which are inserted in a given document."""
+RENDER_ERROR_CHECKSUM = "__RENDER_ERROR__"
+"""Marker used as checksum when diagram rendering fails."""
+ERROR_IMAGE = b"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">
+  <rect width="400" height="200" fill="#d32f2f"/>
+  <text x="200" y="90" text-anchor="middle" fill="white" font-size="24" font-weight="bold">
+    Capella2Polarion: Diagram Failed to Render
+  </text>
+  <text x="200" y="130" text-anchor="middle" fill="white" font-size="18">
+    Please contact support for assistance
+  </text>
+</svg>"""
+"""Static SVG image to use when diagram rendering fails."""
 
 
 class PolarionWorkerParams:
@@ -359,6 +371,42 @@ class CapellaPolarionWorker:
                     attributes["value"], set_attachment_id
                 )
 
+    def _prepare_attachment(
+        self,
+        attachment: polarion_api.WorkItemAttachment,
+        work_item_id: str,
+        new_checksums: dict[str, str],
+        old_checksum: str | None = None,
+        is_update: bool = False,
+    ) -> list[polarion_api.WorkItemAttachment] | None:
+        if not isinstance(attachment, data_model.Capella2PolarionAttachment):
+            return [attachment]
+
+        base_file_name = (
+            attachment.file_name.rsplit(".", 1)[0]
+            if attachment.file_name
+            else ""
+        )
+
+        try:
+            _ = attachment.content_bytes
+            return [attachment]
+        except Exception:
+            new_checksums[base_file_name] = RENDER_ERROR_CHECKSUM
+
+            logger.exception(
+                "Failed to render diagram %s for WorkItem %s",
+                attachment.file_name,
+                work_item_id,
+            )
+
+            if is_update and old_checksum == RENDER_ERROR_CHECKSUM:
+                return None
+
+            attachment.content_bytes = ERROR_IMAGE
+            png_attachment = data_model.PngConvertedSvgAttachment(attachment)
+            return [attachment, png_attachment]
+
     def update_attachments(
         self,
         new: data_model.CapellaWorkItem,
@@ -412,8 +460,19 @@ class CapellaPolarionWorker:
             new_attachment_dict.get,  # type:ignore[arg-type]
             new_attachment_file_names - old_attachment_file_names,
         )
-        if new_attachments := list(filter(None, new_attachments)):
-            self.project_client.work_items.attachments.create(new_attachments)
+
+        validated_new_attachments = []
+        for attachment in filter(None, new_attachments):
+            prepared = self._prepare_attachment(
+                attachment, new.id or "", new_checksums
+            )
+            if prepared:
+                validated_new_attachments.extend(prepared)
+
+        if validated_new_attachments:
+            self.project_client.work_items.attachments.create(
+                validated_new_attachments
+            )
             created = True
 
         attachments_for_update: dict[str, polarion_api.WorkItemAttachment] = {}
@@ -423,13 +482,43 @@ class CapellaPolarionWorker:
             base_file_name = common_attachment_file_name.rsplit(".", 1)[0]
             attachment = new_attachment_dict[common_attachment_file_name]
             attachment.id = old_attachment_dict[common_attachment_file_name].id
-            if attachment.file_name is not None and (
-                new_checksums.get(base_file_name)
-                != old_checksums.get(base_file_name)
+
+            old_checksum = old_checksums.get(base_file_name)
+            new_checksum = new_checksums.get(base_file_name)
+
+            error_to_success = (
+                old_checksum == RENDER_ERROR_CHECKSUM
+                and new_checksum != RENDER_ERROR_CHECKSUM
+            )
+
+            needs_update = (
+                new_checksum != old_checksum
                 or self.force_update
                 or attachment.mime_type == "image/svg+xml"
-            ):
-                attachments_for_update[attachment.file_name] = attachment
+                or error_to_success
+            )
+
+            if not needs_update:
+                continue
+
+            if not attachment.file_name:
+                continue
+
+            prepared = self._prepare_attachment(
+                attachment,
+                new.id or "",
+                new_checksums,
+                old_checksum,
+                is_update=True,
+            )
+
+            if prepared is None or len(prepared) == 0:
+                # Rendering failed or same error as before, skip
+                continue
+
+            for att in prepared:
+                if att.file_name:
+                    attachments_for_update[att.file_name] = att
 
         for file_name, attachment in attachments_for_update.items():
             # SVGs should only be updated if their PNG differs
