@@ -1,0 +1,15 @@
+# Copyright DB InfraGO AG and contributors
+# SPDX-License-Identifier: CC0-1.0
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: chore
