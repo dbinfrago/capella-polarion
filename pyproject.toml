@@ -98,7 +98,7 @@ no_implicit_optional = true
 show_error_codes = true
 warn_redundant_casts = true
 warn_unreachable = true
-python_version = "3.13"
+python_version = "3.11"
 
 [[tool.mypy.overrides]]
 # Untyped third party libraries
