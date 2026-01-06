@@ -15,7 +15,7 @@ import sys
 sys.path.insert(0, os.path.abspath("../.."))
 
 # -- Project information -----------------------------------------------------
-import tomli as tomllib
+import tomllib
 
 import capella2polarion
 
