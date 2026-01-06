@@ -19,11 +19,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           filter: tree:0
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
@@ -35,7 +35,7 @@ jobs:
           SPHINXOPTS: ${{ github.ref != 'refs/heads/main' && '-W' || '' }}
         run: make -C docs html
       - name: Upload built docs as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Documentation
           path: docs/build/html
