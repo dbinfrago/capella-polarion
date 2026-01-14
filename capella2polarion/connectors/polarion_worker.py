@@ -378,7 +378,7 @@ class CapellaPolarionWorker:
         new_checksums: dict[str, str],
         old_checksum: str | None = None,
         is_update: bool = False,
-    ) -> list[polarion_api.WorkItemAttachment] | None:
+    ) -> list[polarion_api.WorkItemAttachment]:
         if not isinstance(attachment, data_model.Capella2PolarionAttachment):
             return [attachment]
 
@@ -401,7 +401,7 @@ class CapellaPolarionWorker:
             )
 
             if is_update and old_checksum == RENDER_ERROR_CHECKSUM:
-                return None
+                return []
 
             attachment.content_bytes = ERROR_IMAGE
             png_attachment = data_model.PngConvertedSvgAttachment(attachment)
@@ -466,8 +466,7 @@ class CapellaPolarionWorker:
             prepared = self._prepare_attachment(
                 attachment, new.id or "", new_checksums
             )
-            if prepared:
-                validated_new_attachments.extend(prepared)
+            validated_new_attachments.extend(prepared)
 
         if validated_new_attachments:
             self.project_client.work_items.attachments.create(
@@ -511,11 +510,6 @@ class CapellaPolarionWorker:
                 old_checksum,
                 is_update=True,
             )
-
-            if prepared is None or len(prepared) == 0:
-                # Rendering failed or same error as before, skip
-                continue
-
             for att in prepared:
                 if att.file_name:
                     attachments_for_update[att.file_name] = att

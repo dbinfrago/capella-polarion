@@ -452,13 +452,15 @@ def test_update_context_diagram_no_changes(
         model.by_uuid(TEST_PHYS_FNC),
     )
 
-    converter.generate_work_items(worker.polarion_data_repo, False, True)
-    worker.compare_and_update_work_item(
-        converter.converter_session[TEST_PHYS_FNC]
-    )
+    with mock.patch.object(context.ContextDiagram, "render") as wrapped_render:
+        converter.generate_work_items(worker.polarion_data_repo, False, True)
+        worker.compare_and_update_work_item(
+            converter.converter_session[TEST_PHYS_FNC]
+        )
 
     assert worker.project_client.work_items.update.call_count == 0
     assert worker.project_client.work_items.attachments.update.call_count == 0
+    assert wrapped_render.call_count == 0
 
 
 def test_update_context_diagram_with_changes(
@@ -851,7 +853,7 @@ def test_prepare_attachment_skips_update_when_error_persists(
             is_update=True,
         )
 
-    assert result is None
+    assert result == []
     assert (
         new_checksums["__C2P__diagram"]
         == polarion_worker.RENDER_ERROR_CHECKSUM
