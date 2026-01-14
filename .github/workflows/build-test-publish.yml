@@ -54,6 +54,9 @@ jobs:
           python-version: "3.13"
       - name: Run Pre-Commit
         run: uv run pre-commit run --all-files
+      - name: Show local changes
+        if: always()
+        run: "git diff || :"
 
   build:
     name: Build wheel
