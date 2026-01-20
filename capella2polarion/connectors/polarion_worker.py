@@ -485,16 +485,10 @@ class CapellaPolarionWorker:
             old_checksum = old_checksums.get(base_file_name)
             new_checksum = new_checksums.get(base_file_name)
 
-            error_to_success = (
-                old_checksum == RENDER_ERROR_CHECKSUM
-                and new_checksum != RENDER_ERROR_CHECKSUM
-            )
-
             needs_update = (
                 new_checksum != old_checksum
                 or self.force_update
                 or attachment.mime_type == "image/svg+xml"
-                or error_to_success
             )
 
             if not needs_update:
