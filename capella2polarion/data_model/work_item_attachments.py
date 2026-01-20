@@ -78,13 +78,7 @@ class CapellaDiagramAttachment(Capella2PolarionAttachment):
         """Diagrams are only rendered, if content_bytes are requested."""
         if self._content_bytes:
             return self._content_bytes
-        try:
-            diagram_svg = self.diagram.render("svg", **self.render_params)
-        except Exception as e:
-            logger.error(
-                "Failed to render diagram %s", self.diagram.name, exc_info=e
-            )
-            diagram_svg = self.diagram.as_svg
+        diagram_svg = self.diagram.render("svg", **self.render_params)
         if isinstance(diagram_svg, str):
             diagram_svg = diagram_svg.encode("utf8")
         self._content_bytes = diagram_svg
@@ -142,7 +136,6 @@ class CapellaContextDiagramAttachment(CapellaDiagramAttachment):
                 styleclass_str = json.dumps(
                     styleclass_map, sort_keys=True, separators=(",", ":")
                 )
-
                 self._checksum = hashlib.sha256(
                     f"{input_str};{styleclass_str}".encode()
                 ).hexdigest()

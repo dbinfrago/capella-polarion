@@ -490,7 +490,7 @@ def test_update_context_diagram_with_changes(
         ),
         model.by_uuid(TEST_PHYS_FNC),
     )
-    worker.project_client.work_items.attachments.get_all.return_value = [
+    old_attachments = [
         polarion_api.WorkItemAttachment(
             WORKITEM_ID,
             "ID-1",
@@ -508,7 +508,24 @@ def test_update_context_diagram_with_changes(
             file_name="__C2P__context_diagram.png",
         ),
     ]
-    # read the content manually on update as it be read in the client
+    worker.project_client.work_items.get.return_value = (
+        data_model.CapellaWorkItem(
+            WORKITEM_ID,
+            uuid_capella=TEST_PHYS_FNC,
+            type="test",
+            checksum=json.dumps(
+                {
+                    "__C2P__WORK_ITEM": WI_CONTEXT_DIAGRAM_CHECKSUM,
+                    "__C2P__context_diagram": "123",
+                }
+            ),
+            attachments=old_attachments,
+            attachments_truncated=True,
+        )
+    )
+    worker.project_client.work_items.attachments.get_all.return_value = (
+        old_attachments
+    )
     worker.project_client.work_items.attachments.update.side_effect = (
         read_content
     )
@@ -731,3 +748,173 @@ def test_context_diagram_checksum_changes_with_styleclass(
     assert elk_input1 is elk_input2 or elk_input1 == elk_input2, (
         "elk_input_data should be the same for both attachments"
     )
+
+
+def test_context_diagram_rendering_failure_raises_exception(
+    model: capellambse.MelodyModel,
+):
+    obj = model.by_uuid("d4a22478-5717-4ca7-bfc9-9a193e6218a8")
+    attachment = data_model.CapellaContextDiagramAttachment(
+        obj.context_diagram,
+        "__C2P__context_diagram.svg",
+        {},
+        "Diagram",
+    )
+
+    with (
+        mock.patch.object(
+            attachment.diagram,
+            "render",
+            side_effect=Exception("Test error"),
+        ),
+        pytest.raises(Exception, match="Test error"),
+    ):
+        _ = attachment.content_bytes
+
+
+def test_context_diagram_checksum_does_not_trigger_rendering(
+    model: capellambse.MelodyModel,
+):
+    obj = model.by_uuid("d4a22478-5717-4ca7-bfc9-9a193e6218a8")
+    expected_file_name = "__C2P__context_diagram.svg"
+    expected_render_params = {}
+    expected_title = "Diagram"
+    attachment = data_model.CapellaContextDiagramAttachment(
+        obj.context_diagram,
+        expected_file_name,
+        expected_render_params,
+        expected_title,
+    )
+
+    with mock.patch.object(
+        attachment.diagram,
+        "render",
+        side_effect=Exception(
+            "Render should not be called during checksum calculation"
+        ),
+    ):
+        checksum = attachment.content_checksum
+
+    assert checksum  # Ensure it's not empty
+    assert isinstance(checksum, str)
+
+
+def test_prepare_attachment_uploads_static_error_on_creation_failure(
+    model: capellambse.MelodyModel,
+    worker: polarion_worker.CapellaPolarionWorker,
+):
+    diag = model.diagrams.by_uuid(TEST_DIAG_UUID)
+    attachment = data_model.CapellaDiagramAttachment(
+        diag, "__C2P__diagram.svg", {}, "Test Diagram"
+    )
+
+    with mock.patch.object(
+        diag,
+        "render",
+        side_effect=Exception("Rendering failed"),
+    ):
+        new_checksums: dict[str, str] = {}
+        result = worker._prepare_attachment(
+            attachment, "TEST-WI", new_checksums, is_update=False
+        )
+
+    assert result is not None
+    assert len(result) == 2
+    assert result[0].mime_type == "image/svg+xml"
+    assert result[1].mime_type == "image/png"
+    error_svg = result[0].content_bytes
+    assert b"Diagram Failed to Render" in error_svg
+    assert b"contact support" in error_svg.lower()
+    assert (
+        new_checksums["__C2P__diagram"]
+        == polarion_worker.RENDER_ERROR_CHECKSUM
+    )
+
+
+def test_prepare_attachment_skips_update_when_error_persists(
+    model: capellambse.MelodyModel,
+    worker: polarion_worker.CapellaPolarionWorker,
+):
+    diag = model.diagrams.by_uuid(TEST_DIAG_UUID)
+    attachment = data_model.CapellaDiagramAttachment(
+        diag, "__C2P__diagram.svg", {}, "Test Diagram"
+    )
+    with mock.patch.object(
+        diag,
+        "render",
+        side_effect=Exception("Rendering failed"),
+    ):
+        new_checksums: dict[str, str] = {}
+        result = worker._prepare_attachment(
+            attachment,
+            "TEST-WI",
+            new_checksums,
+            old_checksum=polarion_worker.RENDER_ERROR_CHECKSUM,
+            is_update=True,
+        )
+
+    assert result == []
+    assert (
+        new_checksums["__C2P__diagram"]
+        == polarion_worker.RENDER_ERROR_CHECKSUM
+    )
+
+
+def test_prepare_attachment_uploads_error_when_success_becomes_error(
+    model: capellambse.MelodyModel,
+    worker: polarion_worker.CapellaPolarionWorker,
+):
+    diag = model.diagrams.by_uuid(TEST_DIAG_UUID)
+    attachment = data_model.CapellaDiagramAttachment(
+        diag, "__C2P__diagram.svg", {}, "Test Diagram"
+    )
+
+    with mock.patch.object(
+        diag,
+        "render",
+        side_effect=Exception("Rendering now failing"),
+    ):
+        new_checksums: dict[str, str] = {}
+        result = worker._prepare_attachment(
+            attachment,
+            "TEST-WI",
+            new_checksums,
+            old_checksum="some_valid_checksum_hash",  # Was successful before
+            is_update=True,
+        )
+
+    assert result is not None
+    assert len(result) == 2
+    assert result[0].mime_type == "image/svg+xml"
+    assert result[1].mime_type == "image/png"
+    error_svg = result[0].content_bytes
+    assert b"Diagram Failed to Render" in error_svg
+    assert b"contact support" in error_svg.lower()
+    assert (
+        new_checksums["__C2P__diagram"]
+        == polarion_worker.RENDER_ERROR_CHECKSUM
+    )
+
+
+def test_prepare_attachment_succeeds_after_error(
+    model: capellambse.MelodyModel,
+    worker: polarion_worker.CapellaPolarionWorker,
+):
+    diag = model.diagrams.by_uuid(TEST_DIAG_UUID)
+    attachment = data_model.CapellaDiagramAttachment(
+        diag, "__C2P__diagram.svg", {}, "Test Diagram"
+    )
+    new_checksums: dict[str, str] = {}
+
+    result = worker._prepare_attachment(
+        attachment,
+        "TEST-WI",
+        new_checksums,
+        old_checksum=polarion_worker.RENDER_ERROR_CHECKSUM,  # Was error before
+        is_update=True,
+    )
+
+    assert result is not None
+    assert len(result) == 1
+    assert result[0] is attachment
+    assert "__C2P__diagram" in new_checksums or len(new_checksums) == 0
