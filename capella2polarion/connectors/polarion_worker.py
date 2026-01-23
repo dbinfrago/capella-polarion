@@ -362,11 +362,15 @@ class CapellaPolarionWorker:
     def _prepare_attachment(
         self,
         attachment: polarion_api.WorkItemAttachment,
-        work_item_id: str,
         new_checksums: dict[str, str],
         old_checksum: str | None = None,
         is_update: bool = False,
     ) -> list[polarion_api.WorkItemAttachment]:
+        # PNG attachments are already in the attachment list and should pass through
+        # without modification to avoid triggering re-render of failed diagrams
+        if isinstance(attachment, data_model.PngConvertedSvgAttachment):
+            return [attachment]
+
         if not isinstance(attachment, data_model.Capella2PolarionAttachment):
             return [attachment]
 
@@ -376,24 +380,17 @@ class CapellaPolarionWorker:
             else ""
         )
 
-        try:
-            _ = attachment.content_bytes
+        if attachment.content_checksum != errors.RENDER_ERROR_CHECKSUM:
             return [attachment]
-        except Exception:
-            new_checksums[base_file_name] = errors.RENDER_ERROR_CHECKSUM
 
-            logger.exception(
-                "Failed to render diagram %s for WorkItem %s",
-                attachment.file_name,
-                work_item_id,
-            )
+        new_checksums[base_file_name] = errors.RENDER_ERROR_CHECKSUM
+        if is_update and old_checksum == errors.RENDER_ERROR_CHECKSUM:
+            return []
 
-            if is_update and old_checksum == errors.RENDER_ERROR_CHECKSUM:
-                return []
-
-            attachment.content_bytes = errors.ERROR_IMAGE
-            png_attachment = data_model.PngConvertedSvgAttachment(attachment)
-            return [attachment, png_attachment]
+        # Set error image on SVG - the PNG will convert this cached error image
+        # when its content_bytes is accessed, avoiding re-render of the failed diagram
+        attachment.content_bytes = errors.ERROR_IMAGE
+        return [attachment]
 
     def update_attachments(
         self,
@@ -451,9 +448,7 @@ class CapellaPolarionWorker:
 
         validated_new_attachments = []
         for attachment in filter(None, new_attachments):
-            prepared = self._prepare_attachment(
-                attachment, new.id or "", new_checksums
-            )
+            prepared = self._prepare_attachment(attachment, new_checksums)
             validated_new_attachments.extend(prepared)
 
         if validated_new_attachments:
@@ -486,11 +481,7 @@ class CapellaPolarionWorker:
                 continue
 
             prepared = self._prepare_attachment(
-                attachment,
-                new.id or "",
-                new_checksums,
-                old_checksum,
-                is_update=True,
+                attachment, new_checksums, old_checksum, is_update=True
             )
             for att in prepared:
                 if att.file_name:

@@ -36,7 +36,16 @@ def calculate_content_checksum(
     attachment: polarion_api.WorkItemAttachment,
 ) -> str:
     """Calculate content checksum for an attachment."""
-    return base64.b64encode(attachment.content_bytes or b"").decode("utf8")
+    try:
+        return base64.b64encode(attachment.content_bytes or b"").decode("utf8")
+    except Exception as e:
+        logger.error(
+            "Failed to read content bytes for attachment %s of WorkItem %s.",
+            attachment.file_name,
+            attachment.work_item_id,
+            exc_info=e,
+        )
+        return errors.RENDER_ERROR_CHECKSUM
 
 
 @dataclasses.dataclass
@@ -149,18 +158,7 @@ class CapellaContextDiagramAttachment(CapellaDiagramAttachment):
                     self.work_item_id,
                     exc_info=e,
                 )
-                try:
-                    return super().content_checksum
-                except Exception as render_error:
-                    logger.error(
-                        "Failed to render diagram for attachment %s of WorkItem %s."
-                        " Using error marker checksum.",
-                        self.file_name,
-                        self.work_item_id,
-                        exc_info=render_error,
-                    )
-                    self._checksum = errors.RENDER_ERROR_CHECKSUM
-                    return self._checksum
+                return super().content_checksum
         return self._checksum
 
     def _build_styleclass_map(self, elk_input: t.Any) -> dict[str, str]:
@@ -268,7 +266,6 @@ class PngConvertedSvgAttachment(Capella2PolarionAttachment):
             self._content_bytes = cairosvg.svg2png(
                 self._svg_attachment.content_bytes
             )
-
         return self._content_bytes
 
     @content_bytes.setter

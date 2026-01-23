@@ -11,6 +11,7 @@ import logging
 
 import polarion_rest_api_client as polarion_api
 
+from capella2polarion import errors
 from capella2polarion.data_model import work_item_attachments as wi_att
 
 WORK_ITEM_CHECKSUM_KEY = "__C2P__WORK_ITEM"
@@ -121,17 +122,22 @@ class CapellaWorkItem(polarion_api.WorkItem):
                     attachment
                 )
 
-            attachment_checksums[base_file_name] = hashlib.sha256(
-                json.dumps(
-                    {
-                        "work_item_id": attachment.work_item_id,
-                        "title": attachment.title,
-                        "content_bytes": content_checksum,
-                        "mime_type": attachment.mime_type,
-                        "file_name": attachment.file_name,
-                    }
-                ).encode("utf8")
-            ).hexdigest()
+            if content_checksum != errors.RENDER_ERROR_CHECKSUM:
+                attachment_checksums[base_file_name] = hashlib.sha256(
+                    json.dumps(
+                        {
+                            "work_item_id": attachment.work_item_id,
+                            "title": attachment.title,
+                            "content_bytes": content_checksum,
+                            "mime_type": attachment.mime_type,
+                            "file_name": attachment.file_name,
+                        }
+                    ).encode("utf8")
+                ).hexdigest()
+            else:
+                attachment_checksums[base_file_name] = (
+                    errors.RENDER_ERROR_CHECKSUM
+                )
 
         return dict(sorted(attachment_checksums.items()))
 
