@@ -14,7 +14,7 @@ import polarion_rest_api_client as polarion_api
 from capellambse import helpers as chelpers
 from lxml import etree
 
-from capella2polarion import data_model
+from capella2polarion import data_model, errors
 from capella2polarion.connectors import polarion_repo
 from capella2polarion.elements import data_session
 
@@ -35,18 +35,6 @@ WORK_ITEMS_IN_DOCUMENT_QUERY = (
     "rel1.FK_URI_MODULE = doc.C_URI AND rel1.FK_URI_WORKITEM = item.C_URI))"
 )
 """An SQL query to get work items which are inserted in a given document."""
-RENDER_ERROR_CHECKSUM = "__RENDER_ERROR__"
-"""Marker used as checksum when diagram rendering fails."""
-ERROR_IMAGE = b"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">
-  <rect width="400" height="200" fill="#d32f2f"/>
-  <text x="200" y="90" text-anchor="middle" fill="white" font-size="24" font-weight="bold">
-    Capella2Polarion: Diagram Failed to Render
-  </text>
-  <text x="200" y="130" text-anchor="middle" fill="white" font-size="18">
-    Please contact support for assistance
-  </text>
-</svg>"""
-"""Static SVG image to use when diagram rendering fails."""
 
 
 class PolarionWorkerParams:
@@ -392,7 +380,7 @@ class CapellaPolarionWorker:
             _ = attachment.content_bytes
             return [attachment]
         except Exception:
-            new_checksums[base_file_name] = RENDER_ERROR_CHECKSUM
+            new_checksums[base_file_name] = errors.RENDER_ERROR_CHECKSUM
 
             logger.exception(
                 "Failed to render diagram %s for WorkItem %s",
@@ -400,10 +388,10 @@ class CapellaPolarionWorker:
                 work_item_id,
             )
 
-            if is_update and old_checksum == RENDER_ERROR_CHECKSUM:
+            if is_update and old_checksum == errors.RENDER_ERROR_CHECKSUM:
                 return []
 
-            attachment.content_bytes = ERROR_IMAGE
+            attachment.content_bytes = errors.ERROR_IMAGE
             png_attachment = data_model.PngConvertedSvgAttachment(attachment)
             return [attachment, png_attachment]
 

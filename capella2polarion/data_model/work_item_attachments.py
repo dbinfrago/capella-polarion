@@ -16,6 +16,8 @@ import polarion_rest_api_client as polarion_api
 from capellambse import model
 from capellambse_context_diagrams import context
 
+from capella2polarion import errors
+
 SVG_MIME_TYPE = "image/svg+xml"
 PNG_MIME_TYPE = "image/png"
 logger = logging.getLogger(__name__)
@@ -147,7 +149,18 @@ class CapellaContextDiagramAttachment(CapellaDiagramAttachment):
                     self.work_item_id,
                     exc_info=e,
                 )
-                return super().content_checksum
+                try:
+                    return super().content_checksum
+                except Exception as render_error:
+                    logger.error(
+                        "Failed to render diagram for attachment %s of WorkItem %s."
+                        " Using error marker checksum.",
+                        self.file_name,
+                        self.work_item_id,
+                        exc_info=render_error,
+                    )
+                    self._checksum = errors.RENDER_ERROR_CHECKSUM
+                    return self._checksum
         return self._checksum
 
     def _build_styleclass_map(self, elk_input: t.Any) -> dict[str, str]:

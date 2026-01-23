@@ -10,8 +10,9 @@ import capellambse
 import polarion_rest_api_client as polarion_api
 import pytest
 from capellambse_context_diagrams import context
+from capellambse_context_diagrams import errors as context_errors
 
-from capella2polarion import data_model
+from capella2polarion import data_model, errors
 from capella2polarion.connectors import polarion_repo, polarion_worker
 from capella2polarion.elements import (
     converter_config,
@@ -797,6 +798,37 @@ def test_context_diagram_checksum_does_not_trigger_rendering(
 
     assert checksum  # Ensure it's not empty
     assert isinstance(checksum, str)
+
+
+def test_context_diagram_checksum_handles_elk_input_and_render_failure(
+    model: capellambse.MelodyModel,
+):
+    obj = model.by_uuid("d4a22478-5717-4ca7-bfc9-9a193e6218a8")
+    attachment = data_model.CapellaContextDiagramAttachment(
+        obj.context_diagram,
+        "__C2P__context_diagram.svg",
+        {},
+        "Diagram",
+    )
+    attachment.work_item_id = "TEST-WI"
+
+    with (
+        mock.patch.object(
+            attachment.diagram,
+            "elk_input_data",
+            side_effect=ValueError("Malformed link: '__Derived-CP_INOUT:-1'"),
+        ),
+        mock.patch.object(
+            attachment.diagram,
+            "render",
+            side_effect=context_errors.CycleError(
+                "The interface is a cycle, connecting the same source and target."
+            ),
+        ),
+    ):
+        checksum = attachment.content_checksum
+
+    assert checksum == errors.RENDER_ERROR_CHECKSUM
 
 
 def test_prepare_attachment_uploads_static_error_on_creation_failure(
