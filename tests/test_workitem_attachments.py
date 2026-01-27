@@ -10,8 +10,9 @@ import capellambse
 import polarion_rest_api_client as polarion_api
 import pytest
 from capellambse_context_diagrams import context
+from capellambse_context_diagrams import errors as context_errors
 
-from capella2polarion import data_model
+from capella2polarion import data_model, errors
 from capella2polarion.connectors import polarion_repo, polarion_worker
 from capella2polarion.elements import (
     converter_config,
@@ -799,6 +800,37 @@ def test_context_diagram_checksum_does_not_trigger_rendering(
     assert isinstance(checksum, str)
 
 
+def test_context_diagram_checksum_handles_elk_input_and_render_failure(
+    model: capellambse.MelodyModel,
+):
+    obj = model.by_uuid("d4a22478-5717-4ca7-bfc9-9a193e6218a8")
+    attachment = data_model.CapellaContextDiagramAttachment(
+        obj.context_diagram,
+        "__C2P__context_diagram.svg",
+        {},
+        "Diagram",
+    )
+    attachment.work_item_id = "TEST-WI"
+
+    with (
+        mock.patch.object(
+            attachment.diagram,
+            "elk_input_data",
+            side_effect=ValueError("Malformed link: '__Derived-CP_INOUT:-1'"),
+        ),
+        mock.patch.object(
+            attachment.diagram,
+            "render",
+            side_effect=context_errors.CycleError(
+                "The interface is a cycle, connecting the same source and target."
+            ),
+        ),
+    ):
+        checksum = attachment.content_checksum
+
+    assert checksum == errors.RENDER_ERROR_CHECKSUM
+
+
 def test_prepare_attachment_uploads_static_error_on_creation_failure(
     model: capellambse.MelodyModel,
     worker: polarion_worker.CapellaPolarionWorker,
@@ -809,26 +841,20 @@ def test_prepare_attachment_uploads_static_error_on_creation_failure(
     )
 
     with mock.patch.object(
-        diag,
-        "render",
-        side_effect=Exception("Rendering failed"),
+        diag, "render", side_effect=Exception("Rendering failed")
     ):
         new_checksums: dict[str, str] = {}
         result = worker._prepare_attachment(
-            attachment, "TEST-WI", new_checksums, is_update=False
+            attachment, new_checksums, is_update=False
         )
 
     assert result is not None
-    assert len(result) == 2
+    assert len(result) == 1
     assert result[0].mime_type == "image/svg+xml"
-    assert result[1].mime_type == "image/png"
     error_svg = result[0].content_bytes
     assert b"Diagram Failed to Render" in error_svg
     assert b"contact support" in error_svg.lower()
-    assert (
-        new_checksums["__C2P__diagram"]
-        == polarion_worker.RENDER_ERROR_CHECKSUM
-    )
+    assert new_checksums["__C2P__diagram"] == errors.RENDER_ERROR_CHECKSUM
 
 
 def test_prepare_attachment_skips_update_when_error_persists(
@@ -847,17 +873,13 @@ def test_prepare_attachment_skips_update_when_error_persists(
         new_checksums: dict[str, str] = {}
         result = worker._prepare_attachment(
             attachment,
-            "TEST-WI",
             new_checksums,
-            old_checksum=polarion_worker.RENDER_ERROR_CHECKSUM,
+            old_checksum=errors.RENDER_ERROR_CHECKSUM,
             is_update=True,
         )
 
     assert result == []
-    assert (
-        new_checksums["__C2P__diagram"]
-        == polarion_worker.RENDER_ERROR_CHECKSUM
-    )
+    assert new_checksums["__C2P__diagram"] == errors.RENDER_ERROR_CHECKSUM
 
 
 def test_prepare_attachment_uploads_error_when_success_becomes_error(
@@ -877,23 +899,18 @@ def test_prepare_attachment_uploads_error_when_success_becomes_error(
         new_checksums: dict[str, str] = {}
         result = worker._prepare_attachment(
             attachment,
-            "TEST-WI",
             new_checksums,
             old_checksum="some_valid_checksum_hash",  # Was successful before
             is_update=True,
         )
 
     assert result is not None
-    assert len(result) == 2
+    assert len(result) == 1
     assert result[0].mime_type == "image/svg+xml"
-    assert result[1].mime_type == "image/png"
     error_svg = result[0].content_bytes
     assert b"Diagram Failed to Render" in error_svg
     assert b"contact support" in error_svg.lower()
-    assert (
-        new_checksums["__C2P__diagram"]
-        == polarion_worker.RENDER_ERROR_CHECKSUM
-    )
+    assert new_checksums["__C2P__diagram"] == errors.RENDER_ERROR_CHECKSUM
 
 
 def test_prepare_attachment_succeeds_after_error(
@@ -908,9 +925,8 @@ def test_prepare_attachment_succeeds_after_error(
 
     result = worker._prepare_attachment(
         attachment,
-        "TEST-WI",
         new_checksums,
-        old_checksum=polarion_worker.RENDER_ERROR_CHECKSUM,  # Was error before
+        old_checksum=errors.RENDER_ERROR_CHECKSUM,  # Was error before
         is_update=True,
     )
 
@@ -918,3 +934,63 @@ def test_prepare_attachment_succeeds_after_error(
     assert len(result) == 1
     assert result[0] is attachment
     assert "__C2P__diagram" in new_checksums or len(new_checksums) == 0
+
+
+def test_cycle_error_during_compare_and_update_work_item(
+    model: capellambse.MelodyModel,
+    worker: polarion_worker.CapellaPolarionWorker,
+):
+    func = model.by_uuid(TEST_PHYS_FNC)
+    attachment = data_model.CapellaContextDiagramAttachment(
+        func.context_diagram,
+        "__C2P__context_diagram.svg",
+        {},
+        "Context Diagram",
+    )
+    attachment.work_item_id = "TEST-WI"
+    work_item = data_model.CapellaWorkItem(
+        "TEST-WI",
+        type="function",
+        uuid_capella=TEST_PHYS_FNC,
+        attachments=[attachment],
+    )
+    converter_data = data_session.ConverterData(
+        "Physical Architecture",
+        converter_config.CapellaTypeConfig("function", {}, []),
+        func,
+        work_item,
+    )
+    old_wi = data_model.CapellaWorkItem(
+        "TEST-WI", type="function", uuid_capella=TEST_PHYS_FNC
+    )
+    old_wi.calculate_checksum()
+    worker.polarion_data_repo = polarion_repo.PolarionDataRepository([old_wi])
+    worker.project_client.work_items.get.return_value = old_wi
+    worker.project_client.work_items.attachments.get_all.return_value = []
+
+    with (
+        mock.patch.object(
+            attachment.diagram,
+            "elk_input_data",
+            side_effect=ValueError("Malformed link: '__Derived-CP_INOUT:-1'"),
+        ),
+        mock.patch.object(
+            attachment.diagram,
+            "render",
+            side_effect=context_errors.CycleError(
+                "The interface is a cycle, connecting the same source and target."
+            ),
+        ),
+    ):
+        worker.compare_and_update_work_item(converter_data)
+
+    assert worker.project_client.work_items.update.call_count == 1
+    updated_work_item: data_model.CapellaWorkItem = (
+        worker.project_client.work_items.update.call_args.args[0]
+    )
+    assert updated_work_item.checksum is not None
+    checksum_dict = json.loads(updated_work_item.checksum)
+    assert "__C2P__context_diagram" in checksum_dict
+    assert (
+        checksum_dict["__C2P__context_diagram"] == errors.RENDER_ERROR_CHECKSUM
+    )

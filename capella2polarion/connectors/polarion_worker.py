@@ -14,7 +14,7 @@ import polarion_rest_api_client as polarion_api
 from capellambse import helpers as chelpers
 from lxml import etree
 
-from capella2polarion import data_model
+from capella2polarion import data_model, errors
 from capella2polarion.connectors import polarion_repo
 from capella2polarion.elements import data_session
 
@@ -35,18 +35,6 @@ WORK_ITEMS_IN_DOCUMENT_QUERY = (
     "rel1.FK_URI_MODULE = doc.C_URI AND rel1.FK_URI_WORKITEM = item.C_URI))"
 )
 """An SQL query to get work items which are inserted in a given document."""
-RENDER_ERROR_CHECKSUM = "__RENDER_ERROR__"
-"""Marker used as checksum when diagram rendering fails."""
-ERROR_IMAGE = b"""<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">
-  <rect width="400" height="200" fill="#d32f2f"/>
-  <text x="200" y="90" text-anchor="middle" fill="white" font-size="24" font-weight="bold">
-    Capella2Polarion: Diagram Failed to Render
-  </text>
-  <text x="200" y="130" text-anchor="middle" fill="white" font-size="18">
-    Please contact support for assistance
-  </text>
-</svg>"""
-"""Static SVG image to use when diagram rendering fails."""
 
 
 class PolarionWorkerParams:
@@ -374,11 +362,15 @@ class CapellaPolarionWorker:
     def _prepare_attachment(
         self,
         attachment: polarion_api.WorkItemAttachment,
-        work_item_id: str,
         new_checksums: dict[str, str],
         old_checksum: str | None = None,
         is_update: bool = False,
     ) -> list[polarion_api.WorkItemAttachment]:
+        # PNG attachments are already in the attachment list and should pass through
+        # without modification to avoid triggering re-render of failed diagrams
+        if isinstance(attachment, data_model.PngConvertedSvgAttachment):
+            return [attachment]
+
         if not isinstance(attachment, data_model.Capella2PolarionAttachment):
             return [attachment]
 
@@ -388,24 +380,17 @@ class CapellaPolarionWorker:
             else ""
         )
 
-        try:
-            _ = attachment.content_bytes
+        if attachment.content_checksum != errors.RENDER_ERROR_CHECKSUM:
             return [attachment]
-        except Exception:
-            new_checksums[base_file_name] = RENDER_ERROR_CHECKSUM
 
-            logger.exception(
-                "Failed to render diagram %s for WorkItem %s",
-                attachment.file_name,
-                work_item_id,
-            )
+        new_checksums[base_file_name] = errors.RENDER_ERROR_CHECKSUM
+        if is_update and old_checksum == errors.RENDER_ERROR_CHECKSUM:
+            return []
 
-            if is_update and old_checksum == RENDER_ERROR_CHECKSUM:
-                return []
-
-            attachment.content_bytes = ERROR_IMAGE
-            png_attachment = data_model.PngConvertedSvgAttachment(attachment)
-            return [attachment, png_attachment]
+        # Set error image on SVG - the PNG will convert this cached error image
+        # when its content_bytes is accessed, avoiding re-render of the failed diagram
+        attachment.content_bytes = errors.ERROR_IMAGE
+        return [attachment]
 
     def update_attachments(
         self,
@@ -463,9 +448,7 @@ class CapellaPolarionWorker:
 
         validated_new_attachments = []
         for attachment in filter(None, new_attachments):
-            prepared = self._prepare_attachment(
-                attachment, new.id or "", new_checksums
-            )
+            prepared = self._prepare_attachment(attachment, new_checksums)
             validated_new_attachments.extend(prepared)
 
         if validated_new_attachments:
@@ -498,11 +481,7 @@ class CapellaPolarionWorker:
                 continue
 
             prepared = self._prepare_attachment(
-                attachment,
-                new.id or "",
-                new_checksums,
-                old_checksum,
-                is_update=True,
+                attachment, new_checksums, old_checksum, is_update=True
             )
             for att in prepared:
                 if att.file_name:

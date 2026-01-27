@@ -16,6 +16,8 @@ import polarion_rest_api_client as polarion_api
 from capellambse import model
 from capellambse_context_diagrams import context
 
+from capella2polarion import errors
+
 SVG_MIME_TYPE = "image/svg+xml"
 PNG_MIME_TYPE = "image/png"
 logger = logging.getLogger(__name__)
@@ -34,7 +36,16 @@ def calculate_content_checksum(
     attachment: polarion_api.WorkItemAttachment,
 ) -> str:
     """Calculate content checksum for an attachment."""
-    return base64.b64encode(attachment.content_bytes or b"").decode("utf8")
+    try:
+        return base64.b64encode(attachment.content_bytes or b"").decode("utf8")
+    except Exception as e:
+        logger.error(
+            "Failed to read content bytes for attachment %s of WorkItem %s.",
+            attachment.file_name,
+            attachment.work_item_id,
+            exc_info=e,
+        )
+        return errors.RENDER_ERROR_CHECKSUM
 
 
 @dataclasses.dataclass
@@ -255,7 +266,6 @@ class PngConvertedSvgAttachment(Capella2PolarionAttachment):
             self._content_bytes = cairosvg.svg2png(
                 self._svg_attachment.content_bytes
             )
-
         return self._content_bytes
 
     @content_bytes.setter
