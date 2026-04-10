@@ -35,7 +35,7 @@ jobs:
           SPHINXOPTS: ${{ github.ref != 'refs/heads/main' && '-W' || '' }}
         run: make -C docs html
       - name: Upload built docs as artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: Documentation
           path: docs/build/html
