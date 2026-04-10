@@ -1,0 +1,26 @@
+capella2polarion.plugins package
+================================
+
+.. automodule:: capella2polarion.plugins
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+capella2polarion.plugins.plugin\_config module
+----------------------------------------------
+
+.. automodule:: capella2polarion.plugins.plugin_config
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+capella2polarion.plugins.plugin\_interfaces module
+--------------------------------------------------
+
+.. automodule:: capella2polarion.plugins.plugin_interfaces
+   :members:
+   :show-inheritance:
+   :undoc-members:
