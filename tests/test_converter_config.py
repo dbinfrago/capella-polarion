@@ -48,6 +48,21 @@ class TestConverterConfig:
         }
 
     @staticmethod
+    def test_read_config_realization_diagram_with_params():
+        config = {"add_realization_diagram": {"filters": ["NO_UUID"]}}
+        type_config = converter_config.CapellaTypeConfig(
+            "test",
+            converter_config.ConverterConfig()._force_dict(config),
+            [],
+        )
+
+        assert type_config.converters is not None
+        assert "add_realization_diagram" in type_config.converters
+        assert type_config.converters["add_realization_diagram"][
+            "filters"
+        ] == ["capellambse_context_diagrams-hide.uuids.filter"]
+
+    @staticmethod
     def test_read_config_links(caplog: pytest.LogCaptureFixture):
         caplog.set_level("DEBUG")
         config = converter_config.ConverterConfig()
