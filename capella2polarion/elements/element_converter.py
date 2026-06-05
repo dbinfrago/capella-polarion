@@ -126,6 +126,9 @@ class CapellaWorkItemSerializer:
         work_item_id: str | None,
     ) -> data_model.CapellaWorkItem:
         obj = converter_data.capella_element
+        is_requirement = (
+            getattr(obj, "xtype", None) == "Requirements:Requirement"
+        )
         raw_description = getattr(obj, "description", None)
         uuids, value, attachments = self.renderer.sanitize_text(
             obj,
@@ -133,20 +136,57 @@ class CapellaWorkItemSerializer:
             converter_data.errors,
         )
         converter_data.description_references = uuids
-        requirement_types = self.renderer.get_requirement_types_text(
-            obj, converter_data.errors
+        requirement_types = (
+            {}
+            if is_requirement
+            else self.renderer.get_requirement_types_text(
+                obj, converter_data.errors
+            )
         )
 
         converter_data.work_item = data_model.CapellaWorkItem(
             id=work_item_id,
             type=converter_data.type_config.p_type,
-            title=obj.name,
+            title=obj.uuid if is_requirement else obj.name,
             uuid_capella=obj.uuid,
             description=polarion_api.HtmlContent(value),
             status="open",
             **requirement_types,  # type:ignore[arg-type]
         )
         assert converter_data.work_item is not None
+        for attachment in attachments:
+            polarion_html_helper.add_attachment_to_workitem(
+                converter_data.work_item, attachment
+            )
+
+        return converter_data.work_item
+
+    def _requirement(
+        self, converter_data: data_session.ConverterData
+    ) -> data_model.CapellaWorkItem:
+        """Serialize ReqIF requirements using their text as description."""
+        requirement = converter_data.capella_element
+        assert converter_data.work_item, "No work item set yet"
+        assert (
+            getattr(requirement, "xtype", None) == "Requirements:Requirement"
+        )
+
+        converter_data.work_item.title = (
+            getattr(requirement, "long_name", None)
+            or getattr(requirement, "identifier", None)
+            or getattr(requirement, "chapter_name", None)
+            or requirement.uuid
+        )
+        raw_description = getattr(requirement, "text", None) or getattr(
+            requirement, "description", None
+        )
+        uuids, value, attachments = self.renderer.sanitize_text(
+            requirement,
+            raw_description or markupsafe.Markup(""),
+            converter_data.errors,
+        )
+        converter_data.description_references = uuids
+        converter_data.work_item.description = polarion_api.HtmlContent(value)
         for attachment in attachments:
             polarion_html_helper.add_attachment_to_workitem(
                 converter_data.work_item, attachment
