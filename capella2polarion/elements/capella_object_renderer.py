@@ -195,16 +195,22 @@ class CapellaObjectRenderer(polarion_html_helper.JinjaRendererMixin):
                 errors.add("Found RequirementsRelation with broken target")
                 continue
 
-            if not (req.type and req.text):
+            req_type = getattr(req, "type", None)
+            req_text = getattr(req, "text", None)
+            if not (req_type and req_text):
                 identifier = (
-                    req.long_name or req.name or req.summary or req.uuid
+                    getattr(req, "long_name", None)
+                    or getattr(req, "identifier", None)
+                    or getattr(req, "chapter_name", None)
+                    or getattr(req, "uuid", None)
+                    or repr(req)
                 )
                 errors.add(
                     f"Found Requirement without text or type on {identifier!r}"
                 )
                 continue
 
-            type_texts[req.type.long_name].append(req.text)
+            type_texts[req_type.long_name].append(req_text)
 
         def _format(texts: list[str]) -> polarion_api.HtmlContent:
             if len(texts) > 1:
