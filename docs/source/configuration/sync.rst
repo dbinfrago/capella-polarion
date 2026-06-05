@@ -57,6 +57,11 @@ or ``SystemFunction`` with the ``add_context_diagram`` serializer using ``filter
    :language: yaml
    :lines: 68-71
 
+The diagram serializers ``add_context_diagram``, ``add_tree_diagram`` and
+``add_realization_diagram`` support ``render_params`` and ``filters``. Filter
+aliases are resolved to their capellambse-context-diagrams filter IDs before
+rendering.
+
 Jinja as Description
 ^^^^^^^^^^^^^^^^^^^^
 

@@ -320,7 +320,11 @@ class ConverterConfig:
                 continue
 
             match name:
-                case "add_context_diagram" | "add_tree_diagram":
+                case (
+                    "add_context_diagram"
+                    | "add_tree_diagram"
+                    | "add_realization_diagram"
+                ):
                     params = params or {}
                     if isinstance(params, dict):
                         filtered_config[name] = _filter_context_diagram_config(
@@ -372,8 +376,10 @@ def _read_capella_type_configs(
     # having is_actor set to None
     return sorted(
         conf,
-        key=lambda c: int(c.get("is_actor", _C2P_DEFAULT) != _C2P_DEFAULT)
-        + 2 * int(c.get("nature", _C2P_DEFAULT) != _C2P_DEFAULT),
+        key=lambda c: (
+            int(c.get("is_actor", _C2P_DEFAULT) != _C2P_DEFAULT)
+            + 2 * int(c.get("nature", _C2P_DEFAULT) != _C2P_DEFAULT)
+        ),
     )
 
 

@@ -2282,6 +2282,42 @@ class TestSerializers:
         assert expected_filter in inputs[1].filters
 
     @staticmethod
+    def test_add_realization_diagram(model: capellambse.MelodyModel):
+        uuid = "d4a22478-5717-4ca7-bfc9-9a193e6218a8"
+        obj = model.by_uuid(uuid)
+        type_config = converter_config.CapellaTypeConfig(
+            "test", {"add_realization_diagram": {}}, []
+        )
+        serializer = element_converter.CapellaWorkItemSerializer(
+            model,
+            polarion_repo.PolarionDataRepository(),
+            {uuid: data_session.ConverterData("la", type_config, obj)},
+            True,
+        )
+
+        with mock.patch.object(
+            serializer, "_draw_additional_attributes_diagram"
+        ) as draw_diagram_mock:
+            work_item = serializer.serialize(uuid)
+
+        assert draw_diagram_mock.call_count == 1
+        assert work_item is not None
+        (
+            called_work_item,
+            diagram,
+            field_id,
+            title,
+            render_params,
+        ) = draw_diagram_mock.call_args.args
+        assert called_work_item == work_item
+        assert repr(diagram) == repr(obj.realization_view)
+        assert (field_id, title, render_params) == (
+            "realization_view",
+            "Realization View",
+            None,
+        )
+
+    @staticmethod
     def test_add_tree_view_with_params(
         model: capellambse.MelodyModel,
     ):

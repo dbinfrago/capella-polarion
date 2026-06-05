@@ -75,13 +75,19 @@ specific serializer alone:
 |                                      | will be passed to the render function of capellambse.|
 |                                      | See `context-diagrams filters`_ for documentation.   |
 +--------------------------------------+------------------------------------------------------+
-| add_tree_view                        | A serializer adding a tree view diagram to the       |
+| add_tree_diagram                     | A serializer adding a tree view diagram to the       |
 |                                      | work item. Same requirements as for                  |
 |                                      | ``add_context_diagram``. `Tree View Documentation`_. |
 |                                      | You can provide ``render_params`` in the config and  |
 |                                      | these will be passed to the render function of       |
 |                                      | capellambse.                                         |
 |                                      | ``filters`` are available here too.                  |
++--------------------------------------+------------------------------------------------------+
+| add_realization_diagram              | A serializer adding a realization view diagram to    |
+|                                      | the work item. Same requirements as for              |
+|                                      | ``add_context_diagram``. `Realization View           |
+|                                      | Documentation`_. You can provide ``render_params``   |
+|                                      | and ``filters`` in the config.                       |
 +--------------------------------------+------------------------------------------------------+
 | add_jinja_fields                     | A serializer that allows custom field values to be   |
 |                                      | filled with rendered Jinja2 template content. This   |
@@ -97,6 +103,7 @@ specific serializer alone:
 
 .. _context-diagrams documentation: https://capellambse-context-diagrams.readthedocs.io/#context-diagram-extension-for-capellambse
 .. _Tree View documentation: https://capellambse-context-diagrams.readthedocs.io/tree_view/
+.. _Realization View documentation: https://capellambse-context-diagrams.readthedocs.io/en/stable/realization_view/
 .. _context-diagrams filters: https://capellambse-context-diagrams.readthedocs.io/extras/filters/
 
 Links
