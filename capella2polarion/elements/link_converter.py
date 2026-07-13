@@ -12,8 +12,9 @@ from collections import defaultdict
 import capellambse
 import polarion_rest_api_client as polarion_api
 from capellambse import model as m
+from polarion_rest_api_client.document_rendering import html_utils as pdr_html
 
-from capella2polarion import data_model, polarion_html_helper
+from capella2polarion import data_model
 from capella2polarion.connectors import polarion_repo
 from capella2polarion.elements import (
     converter_config,
@@ -23,7 +24,7 @@ from capella2polarion.elements import (
 logger = logging.getLogger(__name__)
 
 TYPE_RESOLVERS = {"Part": lambda obj: obj.type.uuid}
-_Serializer: t.TypeAlias = cabc.Callable[
+type _Serializer = cabc.Callable[
     [m.ModelElement | m.Diagram, str, str, dict[str, t.Any]],
     list[polarion_api.WorkItemLink],
 ]
@@ -369,7 +370,7 @@ def _group_by(
 def _make_url_list(link_map: dict[str, dict[str, list[str]]]) -> str:
     urls: list[str] = []
     for link_id in sorted(link_map):
-        url = polarion_html_helper.POLARION_WORK_ITEM_URL.format(pid=link_id)
+        url = pdr_html.POLARION_WORK_ITEM_URL.format(pid=link_id)
         urls.append(f"<li>{url}</li>")
         for key, include_wids in link_map[link_id].items():
             _, display_name, _ = key.split(":")
@@ -386,7 +387,7 @@ def _sorted_unordered_html_list(
 ) -> str:
     urls: list[str] = []
     for pid in work_item_ids:
-        url = polarion_html_helper.POLARION_WORK_ITEM_URL.format(pid=pid)
+        url = pdr_html.POLARION_WORK_ITEM_URL.format(pid=pid)
         urls.append(f"<li>{url}</li>")
 
     urls.sort()

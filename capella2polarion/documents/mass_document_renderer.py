@@ -7,14 +7,14 @@ import logging
 
 import capellambse
 import polarion_rest_api_client as polarion_api
+from polarion_rest_api_client import document_rendering as pdr
+from polarion_rest_api_client.document_rendering import html_utils as pdr_html
 
-from capella2polarion import data_model, polarion_html_helper
 from capella2polarion.connectors import polarion_repo
 from capella2polarion.documents import (
     document_config,
     document_renderer,
 )
-from capella2polarion.documents import text_work_item_provider as twi
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +23,8 @@ logger = logging.getLogger(__name__)
 class ProjectData:
     """A class holding data of a project which documents are rendered for."""
 
-    new_docs: list[data_model.DocumentData] = dataclasses.field(
-        default_factory=list
-    )
-    updated_docs: list[data_model.DocumentData] = dataclasses.field(
+    new_docs: list[pdr.DocumentData] = dataclasses.field(default_factory=list)
+    updated_docs: list[pdr.DocumentData] = dataclasses.field(
         default_factory=list
     )
 
@@ -89,7 +87,7 @@ class MassDocumentRenderer:
                     rendering_layouts,
                     config.heading_numbering,
                 )
-                text_work_item_provider = twi.TextWorkItemProvider(
+                text_work_item_provider = pdr.TextWorkItemProvider(
                     config.text_work_item_id_field,
                     config.text_work_item_type,
                     text_work_items,
@@ -150,7 +148,7 @@ class MassDocumentRenderer:
                     rendering_layouts,
                     config.heading_numbering,
                 )
-                text_work_item_provider = twi.TextWorkItemProvider(
+                text_work_item_provider = pdr.TextWorkItemProvider(
                     config.text_work_item_id_field,
                     config.text_work_item_type,
                     text_work_items,
@@ -215,7 +213,7 @@ class MassDocumentRenderer:
         document.rendering_layouts = document.rendering_layouts or []
         for rendering_layout in rendering_layouts:
             assert rendering_layout.type is not None
-            index = polarion_html_helper.get_layout_index(
+            index = pdr_html.get_layout_index(
                 "section", document.rendering_layouts, rendering_layout.type
             )
             document.rendering_layouts[index] = rendering_layout

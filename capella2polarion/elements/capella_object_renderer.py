@@ -20,6 +20,7 @@ from capellambse import helpers as chelpers
 from capellambse import model as m
 from capellambse_context_diagrams import context
 from lxml import etree, html
+from polarion_rest_api_client.document_rendering import html_utils as pdr_html
 
 from capella2polarion import data_model, polarion_html_helper
 from capella2polarion.connectors import polarion_repo
@@ -122,7 +123,7 @@ class CapellaObjectRenderer(polarion_html_helper.JinjaRendererMixin):
                 caption = node.get("alt", f'Image "{title}" of {obj.name}')
                 node.addnext(
                     html.fromstring(
-                        polarion_html_helper.POLARION_CAPTION.format(
+                        pdr_html.POLARION_CAPTION.format(
                             label="Figure", caption=caption
                         )
                     )
@@ -157,7 +158,7 @@ class CapellaObjectRenderer(polarion_html_helper.JinjaRendererMixin):
             )
         if pid := self.capella_polarion_mapping.get_work_item_id(uuid):
             referenced_uuids.append(uuid)
-            return polarion_html_helper.POLARION_WORK_ITEM_URL.format(pid=pid)
+            return pdr_html.POLARION_WORK_ITEM_URL.format(pid=pid)
 
         errors.add(f"Non-existing work item referenced in description: {uuid}")
         return match.group(default_group)
@@ -275,7 +276,7 @@ class CapellaObjectRenderer(polarion_html_helper.JinjaRendererMixin):
             None,
         ):
             assert attachment.file_name is not None
-            return polarion_html_helper.generate_image_html(
+            return pdr_html.generate_image_html(
                 diagram.name,
                 attachment.file_name,
                 max_width,
@@ -331,7 +332,7 @@ class CapellaObjectRenderer(polarion_html_helper.JinjaRendererMixin):
             attachment = None
 
         return (
-            polarion_html_helper.generate_image_html(
+            pdr_html.generate_image_html(
                 title,
                 file_name,
                 max_width,

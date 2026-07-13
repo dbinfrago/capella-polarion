@@ -22,9 +22,7 @@ logger = logging.getLogger(__name__)
 _C2P_DEFAULT = "_C2P_DEFAULT"
 DESCRIPTION_REFERENCE_SERIALIZER = "description_reference"
 DIAGRAM_ELEMENTS_SERIALIZER = "diagram_elements"
-ConvertersType: t.TypeAlias = dict[
-    str, dict[str, t.Any] | list[dict[str, t.Any]]
-]
+type ConvertersType = dict[str, dict[str, t.Any] | list[dict[str, t.Any]]]
 
 
 @dataclasses.dataclass

@@ -4,6 +4,7 @@ import capellambse
 import polarion_rest_api_client as polarion_api
 import pytest
 from lxml import etree, html
+from polarion_rest_api_client import document_rendering as pdr
 
 from capella2polarion import data_model as dm
 from capella2polarion.connectors import polarion_repo, polarion_worker
@@ -11,7 +12,6 @@ from capella2polarion.documents import (
     document_config,
     document_renderer,
     mass_document_renderer,
-    text_work_item_provider,
 )
 from tests.conftest import (
     DOCUMENT_TEMPLATES,
@@ -252,7 +252,7 @@ def test_mixed_authority_document(
                 "global_param": "Overwrite global param",
             },
         },
-        text_work_item_provider=text_work_item_provider.TextWorkItemProvider(
+        text_work_item_provider=pdr.TextWorkItemProvider(
             "MyField",
             "MyType",
             [
@@ -422,7 +422,7 @@ def test_create_full_authority_document_text_work_items(
         DOCUMENT_TEXT_WORK_ITEMS,
         "_default",
         "TEST-DOC",
-        text_work_item_provider=text_work_item_provider.TextWorkItemProvider(
+        text_work_item_provider=pdr.TextWorkItemProvider(
             "MyField",
             "MyType",
         ),
@@ -481,7 +481,7 @@ def test_update_full_authority_document_text_work_items(
         "_default",
         "TEST-DOC",
         document=old_doc,
-        text_work_item_provider=text_work_item_provider.TextWorkItemProvider(
+        text_work_item_provider=pdr.TextWorkItemProvider(
             "MyField",
             "MyType",
             [
@@ -554,10 +554,12 @@ def test_render_all_documents_partially_successfully(
     insert_error_messages = [
         r
         for r in warnings
-        if r.message.startswith("Error inserting work item:")
+        if r.message.startswith("Error inserting work item for input:")
     ]
     link_error_messages = [
-        r for r in warnings if r.message.startswith("Error linking work item:")
+        r
+        for r in warnings
+        if r.message.startswith("Error linking work item for input:")
     ]
     # There are 8 documents in the config, we expect 3 rendering to fail
     assert len(errors) == 3

@@ -12,6 +12,7 @@ import jinja2
 import polarion_rest_api_client as polarion_api
 import pydantic
 import yaml
+from polarion_rest_api_client.document_rendering import html_utils as pdr_html
 
 from capella2polarion import data_model, polarion_html_helper
 
@@ -51,7 +52,7 @@ class BaseDocumentRenderingConfig(pydantic.BaseModel):
 
     template_directory: str | pathlib.Path
     project_id: str | None = None
-    text_work_item_type: str = polarion_html_helper.TEXT_WORK_ITEM_TYPE
+    text_work_item_type: str = pdr_html.TEXT_WORK_ITEM_TYPE
     text_work_item_id_field: str = polarion_html_helper.TEXT_WORK_ITEM_ID_FIELD
     status_allow_list: list[str] | None = None
     heading_numbering: bool = False
@@ -135,7 +136,7 @@ def generate_work_item_layouts(
             polarion_api.RenderingLayout(
                 type=_type,
                 layouter=layouter,
-                label=polarion_html_helper.camel_case_to_words(_type),
+                label=pdr_html.camel_case_to_words(_type),
                 properties=polarion_api.RenderingProperties(
                     fields_at_start=conf.fields_at_start,
                     fields_at_end=conf.fields_at_end,

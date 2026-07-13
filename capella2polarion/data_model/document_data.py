@@ -5,23 +5,8 @@
 from __future__ import annotations
 
 import dataclasses
-import typing as t
 
-import polarion_rest_api_client as polarion_api
-
-if t.TYPE_CHECKING:
-    from capella2polarion.documents import text_work_item_provider
-
-__all__ = ["DocumentData", "DocumentInfo"]
-
-
-@dataclasses.dataclass
-class DocumentData:
-    """A class to store data related to a rendered document."""
-
-    document: polarion_api.Document
-    headings: list[polarion_api.WorkItem]
-    text_work_item_provider: text_work_item_provider.TextWorkItemProvider
+__all__ = ["DocumentInfo"]
 
 
 @dataclasses.dataclass
