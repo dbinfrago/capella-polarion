@@ -17,8 +17,8 @@ from capella2polarion import data_model
 TEXT_WORK_ITEM_ID_FIELD = "__C2P__id"
 """Custom ID field for text work items created by capella2polarion.
 
-The upstream default is ``__AUTO_RENDER__id``; we use a distinct name
-so documents rendered by this tool can be distinguished.
+The upstream default is ``__AUTO_RENDER__id``; we use a distinct name so
+documents rendered by this tool can be distinguished.
 """
 
 RE_DESCR_DELETED_PATTERN = re.compile(

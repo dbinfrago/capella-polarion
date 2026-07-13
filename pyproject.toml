@@ -49,7 +49,7 @@ capella2polarion = "capella2polarion.__main__:cli"
 [dependency-groups]
 dev = [
   "coverage>=7.13.1",
-  "docformatter[tomli]==1.7.7",
+  "docformatter[tomli]==1.7.8",
   "mypy==1.19.1",
   "pre-commit>=4.5.1",
   "pre-commit-uv>=4.2.0",

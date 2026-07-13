@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 """Configuration file for Sphinx."""
 
-
 # -- Path setup --------------------------------------------------------------
 
 # If extensions (or modules to document with autodoc) are in another directory,

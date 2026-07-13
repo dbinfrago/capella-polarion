@@ -23,9 +23,9 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python_version:
-          - "3.11"
           - "3.12"
           - "3.13"
+          - "3.14"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -51,7 +51,7 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
-          python-version: "3.13"
+          python-version: "3.14"
       - name: Run Pre-Commit
         run: uv run pre-commit run --all-files
 
@@ -67,7 +67,7 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "**/pyproject.toml"
-          python-version: "3.13"
+          python-version: "3.14"
       - name: Build packages
         run: uv build --no-sources
       - name: Verify packages

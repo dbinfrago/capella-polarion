@@ -107,6 +107,8 @@ class FakeModelObject(m.ModelElement, ns=TEST_NAMESPACE):
 class UnsupportedFakeModelObject(FakeModelObject, ns=TEST_NAMESPACE):
     """A ``FakeModelObject`` which shouldn't be migrated."""
 
+    pass  # noqa: PIE790
+
 
 @pytest.fixture(autouse=True)
 def inject_test_classes(monkeypatch):
