@@ -8,14 +8,18 @@ import logging
 import typing as t
 
 import capellambse
-import polarion_rest_api_client as polarion_api
 from capellambse import model as m
 from polarion_rest_api_client import document_rendering as pdr
 
 from capella2polarion.connectors import polarion_repo
 
 AREA_END_CLS = "c2pAreaEnd"
+"""This class is expected for a div in a wiki macro to end a rendering area in
+mixed authority documents."""
+
 AREA_START_CLS = "c2pAreaStart"
+"""This class is expected for a div in a wiki macro to start a rendering area
+in mixed authority documents."""
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +50,7 @@ class DocumentRenderer(pdr.DocumentRenderer):
         self,
         obj: object,
         work_item_id: str | None = None,
-    ) -> tuple[str | None, polarion_api.WorkItem | None]:
+    ) -> pdr.document_renderer.WorkItemLookupResult:
         """Resolve Capella elements; delegate all other inputs to base."""
         if isinstance(obj, m.ElementList):
             raise TypeError("Cannot make an href to a list of elements")
