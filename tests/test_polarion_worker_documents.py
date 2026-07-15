@@ -3,10 +3,9 @@
 from unittest import mock
 
 import polarion_rest_api_client as polarion_api
+from polarion_rest_api_client import document_rendering as pdr
 
-from capella2polarion import data_model
 from capella2polarion.connectors import polarion_worker
-from capella2polarion.documents import text_work_item_provider
 
 from .conftest import DOCUMENT_TEMPLATES, DOCUMENT_TEXT_WORK_ITEMS
 
@@ -24,10 +23,10 @@ def test_update_document(
             value=path.read_text("utf-8"),
         ),
     )
-    document_data = data_model.DocumentData(
+    document_data = pdr.DocumentData(
         document,
         [],
-        text_work_item_provider.TextWorkItemProvider(
+        pdr.TextWorkItemProvider(
             "MyField",
             "MyType",
             [
@@ -72,10 +71,10 @@ def test_create_document(
             value=path.read_text("utf-8"),
         ),
     )
-    document_data = data_model.DocumentData(
+    document_data = pdr.DocumentData(
         document,
         [],
-        text_work_item_provider.TextWorkItemProvider(
+        pdr.TextWorkItemProvider(
             "MyField",
             "MyType",
         ),
@@ -116,10 +115,10 @@ def test_use_correct_client(
         ),
     )
 
-    document_data = data_model.DocumentData(
+    document_data = pdr.DocumentData(
         document,
         [],
-        text_work_item_provider.TextWorkItemProvider(),
+        pdr.TextWorkItemProvider(),
     )
 
     empty_polarion_worker.create_documents([document_data], "OtherProject")

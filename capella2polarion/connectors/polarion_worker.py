@@ -13,6 +13,7 @@ import httpx
 import polarion_rest_api_client as polarion_api
 from capellambse import helpers as chelpers
 from lxml import etree
+from polarion_rest_api_client import document_rendering as pdr
 
 from capella2polarion import data_model, errors
 from capella2polarion.connectors import polarion_repo
@@ -533,7 +534,7 @@ class CapellaPolarionWorker:
 
     def create_documents(
         self,
-        document_datas: list[data_model.DocumentData],
+        document_datas: list[pdr.DocumentData],
         document_project: str | None = None,
     ) -> None:
         """Create new documents.
@@ -550,7 +551,7 @@ class CapellaPolarionWorker:
 
     def update_documents(
         self,
-        document_datas: list[data_model.DocumentData],
+        document_datas: list[pdr.DocumentData],
         document_project: str | None = None,
     ) -> None:
         """Update existing documents.
@@ -571,7 +572,7 @@ class CapellaPolarionWorker:
     def _process_document_datas(
         self,
         client: polarion_api.ProjectClient,
-        document_datas: list[data_model.DocumentData],
+        document_datas: list[pdr.DocumentData],
     ) -> tuple[
         list[polarion_api.data_models.Document],
         list[polarion_api.data_models.WorkItem],

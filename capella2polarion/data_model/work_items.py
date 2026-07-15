@@ -148,7 +148,6 @@ class CapellaWorkItem(polarion_api.WorkItem):
         Filenames must be unique and same filenames are only valid for
         png&svg pairs.
         """
-
         data = {
             "title": self.title,
             "description": self.description,
