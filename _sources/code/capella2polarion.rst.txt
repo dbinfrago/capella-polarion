@@ -1,0 +1,46 @@
+capella2polarion package
+========================
+
+.. automodule:: capella2polarion
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   capella2polarion.connectors
+   capella2polarion.data_model
+   capella2polarion.documents
+   capella2polarion.elements
+   capella2polarion.plugins
+
+Submodules
+----------
+
+capella2polarion.cli module
+---------------------------
+
+.. automodule:: capella2polarion.cli
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+capella2polarion.errors module
+------------------------------
+
+.. automodule:: capella2polarion.errors
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+capella2polarion.polarion\_html\_helper module
+----------------------------------------------
+
+.. automodule:: capella2polarion.polarion_html_helper
+   :members:
+   :show-inheritance:
+   :undoc-members:
